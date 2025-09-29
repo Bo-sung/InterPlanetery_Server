@@ -1,0 +1,22 @@
+# Visual Studio generated
+*.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# Rider
+.idea/
+
+# User-specific files
+*.DotSettings.user
+
+# Other
+*.log
+*.log.*
+*.DS_Store
+Thumbs.db
