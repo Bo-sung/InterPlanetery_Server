@@ -20,3 +20,28 @@
 *.log.*
 *.DS_Store
 Thumbs.db
+
+# AI Services (Claude Code, Copilot, etc.)
+.claude/
+.copilot/
+.cursor/
+.aider/
+*.ai/
+.claude-code/
+.ai-history/
+.llm/
+.gpt/
+
+# AI configuration files
+.clauderc
+.copilotrc
+.cursorrc
+.aiconfig
+ai-config.json
+.ai-settings.json
+
+# AI cache and temp files
+*.ai-cache
+*.llm-cache
+.ai-temp/
+.llm-temp/
