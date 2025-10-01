@@ -57,36 +57,98 @@ Server/
 
 ### 아키텍처 다이어그램
 
-```
-┌─────────────────────────────────────────┐
-│          RoomManager (싱글톤)            │
-│  - 모든 룸 관리                          │
-│  - 룸 생성/삭제                          │
-│  - 매칭 처리                             │
-│  - 5초마다 빈 룸 자동 정리               │
-└─────────────────────────────────────────┘
-              │
-              ├─────────────────┬──────────────────┐
-              ▼                 ▼                  ▼
-      ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-      │ GameRoom #1  │  │ GameRoom #2  │  │ GameRoom #3  │
-      │  (2/2명)     │  │  (1/2명)     │  │  (0/2명)     │
-      └──────────────┘  └──────────────┘  └──────────────┘
-            │                 │                    │
-        ┌───┴───┐            │                 (빈 룸)
-        ▼       ▼            ▼                5초 후 삭제
-   ┌────────┐ ┌────────┐ ┌────────┐
-   │Session │ │Session │ │Session │
-   │  #1    │ │  #2    │ │  #3    │
-   └────────┘ └────────┘ └────────┘
-        │         │          │
-        ▼         ▼          ▼
-   [Client1]  [Client2]  [Client3]
+```mermaid
+graph TB
+    RM[RoomManager 싱글톤<br/>- 모든 룸 관리<br/>- 룸 생성/삭제<br/>- 매칭 처리<br/>- 5초마다 빈 룸 자동 정리]
+    
+    GR1[GameRoom #1<br/>2/2명]
+    GR2[GameRoom #2<br/>1/2명]
+    GR3[GameRoom #3<br/>0/2명<br/>빈 룸<br/>5초 후 삭제]
+    
+    S1[Session #1]
+    S2[Session #2]
+    S3[Session #3]
+    
+    C1[Client1]
+    C2[Client2]
+    C3[Client3]
+    
+    RM --> GR1
+    RM --> GR2
+    RM --> GR3
+    
+    GR1 --> S1
+    GR1 --> S2
+    GR2 --> S3
+    
+    S1 --> C1
+    S2 --> C2
+    S3 --> C3
 ```
 
 ---
 
 ## 핵심 컴포넌트
+
+### 컴포넌트 관계도
+
+```mermaid
+classDiagram
+    class RoomManager {
+        -Dictionary~string, GameRoom~ rooms
+        -int roomIdCounter
+        -Timer cleanupTimer
+        +CreateRoom() GameRoom
+        +GetRoom(string) GameRoom
+        +FindAvailableRoom() GameRoom
+        +MatchPlayer(ClientSession)
+        +RemoveRoom(string)
+        +CleanupEmptyRooms()
+    }
+    
+    class GameRoom {
+        +string RoomId
+        +int MaxPlayers
+        -List~ClientSession~ players
+        -object lockObj
+        +AddPlayer(ClientSession)
+        +RemovePlayer(ClientSession)
+        +BroadcastMessage(ChatMessage)
+        +BroadcastUserJoined(string)
+        +BroadcastUserLeft(string)
+        +NotifyRoomClosed()
+        +CloseAllConnections()
+    }
+    
+    class ClientSession {
+        +string SessionId
+        +TcpClient TcpClient
+        +GameRoom CurrentRoom
+        -DateTime lastActivityTime
+        -Timer timeoutCheckTimer
+        +StartAsync()
+        +ReceiveLoop()
+        +HandleProtocol(Protocol)
+        +HandleHeartbeat()
+        +CheckTimeout()
+        +IsSocketConnected() bool
+        +Disconnect()
+    }
+    
+    class Protocol {
+        +int Type
+        +long Timestamp
+        -Dictionary~string, object~ parameters
+        +AddParam(string, object)
+        +GetParam~T~(string) T
+        +Serialize() byte[]
+        +Deserialize(byte[]) Protocol
+    }
+    
+    RoomManager "1" --> "*" GameRoom : manages
+    GameRoom "1" --> "*" ClientSession : contains
+    ClientSession --> Protocol : uses
+```
 
 ### 1. ClientSession (유저당 1개)
 
@@ -265,17 +327,47 @@ public struct RoomInfo
 
 ## 연결 관리 및 보안
 
+### 연결 상태 관리
+
+```mermaid
+stateDiagram-v2
+    [*] --> Connected: TCP Connect
+    Connected --> Active: 메시지 수신
+    Active --> Active: 메시지 계속 수신<br/>(lastActivityTime 갱신)
+    Active --> Timeout: 30초 무응답
+    Active --> Disconnected: 소켓 에러
+    Active --> Disconnected: 클라이언트 종료
+    Timeout --> Disconnected: 자동 연결 해제
+    Disconnected --> [*]: 리소스 정리
+    
+    note right of Active
+        5초마다 CheckTimeout
+        하트비트 수신 시 갱신
+    end note
+    
+    note right of Disconnected
+        - Room에서 제거
+        - 소켓 닫기
+        - 타이머 정리
+    end note
+```
+
 ### 1. 하트비트 시스템
 
 **목적**: 클라이언트 연결 상태 확인
 
-```
-클라이언트                     서버
-    |                           |
-    |------- HEARTBEAT -------->|
-    |                           | (lastActivityTime 갱신)
-    |<---- HEARTBEAT_ACK -------|
-    |                           |
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    
+    loop 5~10초마다
+        Client->>Server: HEARTBEAT
+        activate Server
+        Note over Server: lastActivityTime 갱신
+        Server-->>Client: HEARTBEAT_ACK<br/>(serverTime)
+        deactivate Server
+    end
 ```
 
 **권장 주기**: 5~10초마다 클라이언트가 전송
@@ -350,103 +442,177 @@ if (messageLength <= 0 || messageLength > 1024 * 1024) // 1MB 제한
 
 ## 데이터 흐름
 
+### 프로토콜 처리 흐름
+
+```mermaid
+flowchart TD
+    Start([메시지 수신]) --> ReadLength[4바이트 길이 읽기]
+    ReadLength --> CheckLength{길이 유효?}
+    CheckLength -->|No| Error1[에러: 연결 종료]
+    CheckLength -->|Yes| ReadData[데이터 읽기]
+    ReadData --> Deserialize[Protocol 역직렬화]
+    Deserialize --> CheckType{프로토콜 타입}
+    
+    CheckType -->|JOIN_ROOM| HandleJoin[HandleJoinRoom]
+    CheckType -->|LEAVE_ROOM| HandleLeave[HandleLeaveRoom]
+    CheckType -->|CHAT_MESSAGE| HandleChat[HandleChatMessage]
+    CheckType -->|HEARTBEAT| HandleHB[HandleHeartbeat]
+    CheckType -->|Unknown| Error2[에러 응답]
+    
+    HandleJoin --> UpdateActivity[lastActivityTime 갱신]
+    HandleLeave --> UpdateActivity
+    HandleChat --> UpdateActivity
+    HandleHB --> UpdateActivity
+    
+    UpdateActivity --> Start
+    Error1 --> End([연결 종료])
+    Error2 --> Start
+```
+
 ### 1. 클라이언트 접속 및 매칭
 
+```mermaid
+sequenceDiagram
+    participant ClientA as Client A
+    participant Server
+    participant RoomMgr as RoomManager
+    
+    ClientA->>Server: TCP Connect
+    activate Server
+    Note over Server: ClientSession 생성 및 시작
+    Server->>RoomMgr: MatchPlayer()
+    activate RoomMgr
+    Note over RoomMgr: 빈 룸 검색
+    Note over RoomMgr: 없으면 새 룸 생성
+    RoomMgr-->>Server: GameRoom #1
+    deactivate RoomMgr
+    Note over Server: Room에 Session 추가
+    Server-->>ClientA: JOIN_SUCCESS<br/>(sessionId, roomInfo)
+    deactivate Server
 ```
-Client A                  Server                    RoomManager
-   |                         |                           |
-   |---- TCP Connect ------->|                           |
-   |                         |                           |
-   |                    [ClientSession                   |
-   |                     생성 및 시작]                   |
-   |                         |                           |
-   |                         |------ MatchPlayer() ----->|
-   |                         |                           |
-   |                         |                      [빈 룸 검색]
-   |                         |                      [없으면 새 룸 생성]
-   |                         |<----- GameRoom #1 --------|
-   |                         |                           |
-   |                    [Room에 Session                  |
-   |                     추가]                            |
-   |                         |                           |
-   |<--- JOIN_SUCCESS -------|                           |
-   | (sessionId, roomInfo)   |                           |
-   |                         |                           |
+
+### 매칭 알고리즘
+
+```mermaid
+flowchart TD
+    Start([MatchPlayer 호출]) --> FindRoom{빈자리 있는<br/>룸 찾기}
+    FindRoom -->|발견| AddToRoom[기존 룸에 추가]
+    FindRoom -->|없음| CreateNew[새 룸 생성]
+    CreateNew --> AddToNew[새 룸에 추가]
+    
+    AddToRoom --> CheckFull{룸 가득참?}
+    AddToNew --> CheckFull
+    
+    CheckFull -->|Yes| Notify1[양쪽 플레이어에게<br/>입장 완료 알림]
+    CheckFull -->|No| Notify2[입장한 플레이어에게<br/>대기 알림]
+    
+    Notify1 --> End([완료])
+    Notify2 --> End
 ```
 
 ---
 
 ### 2. 채팅 메시지 전송
 
-```
-Client A              Session A          GameRoom         Session B              Client B
-   |                     |                    |                 |                    |
-   |--- CHAT_MESSAGE --->|                    |                 |                    |
-   | ("Hello")           |                    |                 |                    |
-   |                     |                    |                 |                    |
-   |                [UpdateLastActivity]      |                 |                    |
-   |                     |                    |                 |                    |
-   |                     |-- BroadcastMessage()                 |                    |
-   |                     |                    |                 |                    |
-   |                     |                [브로드캐스트]        |                    |
-   |                     |                    |                 |                    |
-   |<------------ CHAT_BROADCAST ------------|-- CHAT_BROADCAST ------------------>|
-   | (SenderId, Message, Timestamp)          | (SenderId, Message, Timestamp)      |
-   |                     |                    |                 |                    |
+```mermaid
+sequenceDiagram
+    participant ClientA as Client A
+    participant SessionA as Session A
+    participant Room as GameRoom
+    participant SessionB as Session B
+    participant ClientB as Client B
+    
+    ClientA->>SessionA: CHAT_MESSAGE<br/>("Hello")
+    activate SessionA
+    Note over SessionA: UpdateLastActivity
+    SessionA->>Room: BroadcastMessage()
+    activate Room
+    Note over Room: 브로드캐스트
+    Room->>SessionA: CHAT_BROADCAST<br/>(SenderId, Message, Timestamp)
+    Room->>SessionB: CHAT_BROADCAST<br/>(SenderId, Message, Timestamp)
+    deactivate Room
+    SessionA-->>ClientA: CHAT_BROADCAST
+    SessionB-->>ClientB: CHAT_BROADCAST
+    deactivate SessionA
 ```
 
 ---
 
 ### 3. 룸 나가기 (Command: -1)
 
+```mermaid
+sequenceDiagram
+    participant ClientA as Client A
+    participant SessionA as Session A
+    participant Room as GameRoom
+    participant SessionB as Session B
+    
+    ClientA->>SessionA: CHAT_MESSAGE<br/>("-1")
+    activate SessionA
+    Note over SessionA: HandleLeaveRoom
+    SessionA->>Room: RemovePlayer
+    activate Room
+    Room->>SessionB: USER_LEFT<br/>(userId, count)
+    Note over Room: 빈 룸 체크
+    Note over Room: 5초 후 자동 삭제
+    deactivate Room
+    SessionA-->>ClientA: LEAVE_SUCCESS
+    Note over SessionA: 연결 종료
+    deactivate SessionA
 ```
-Client A              Session A          GameRoom         Session B
-   |                     |                    |                 |
-   |--- CHAT_MESSAGE --->|                    |                 |
-   | ("-1")              |                    |                 |
-   |                     |                    |                 |
-   |              [HandleLeaveRoom]           |                 |
-   |                     |                    |                 |
-   |                     |-- RemovePlayer --->|                 |
-   |                     |                    |                 |
-   |                     |                    |-- USER_LEFT --->|
-   |                     |                    | (userId, count) |
-   |                     |                    |                 |
-   |<-- LEAVE_SUCCESS ---|                    |                 |
-   |                     |                    |                 |
-   |  [연결 종료]        |                    |                 |
-   |                     |                    |                 |
-   |                     |               [빈 룸 체크]          |
-   |                     |               [5초 후 자동 삭제]    |
-   |                     |                    |                 |
+
+### 룸 생명주기
+
+```mermaid
+stateDiagram-v2
+    [*] --> Created: RoomManager.CreateRoom()
+    Created --> WaitingPlayer: 빈 룸 상태 (0명)
+    WaitingPlayer --> OnePlayer: 첫 플레이어 입장
+    OnePlayer --> Full: 두 번째 플레이어 입장
+    Full --> OnePlayer: 한 명 퇴장
+    OnePlayer --> WaitingPlayer: 마지막 플레이어 퇴장
+    WaitingPlayer --> Deleted: 5초 후 자동 정리
+    Deleted --> [*]
+    
+    note right of WaitingPlayer
+        CleanupTimer가
+        5초마다 체크
+    end note
+    
+    note right of Full
+        최대 인원 도달
+        더 이상 입장 불가
+    end note
 ```
 
 ---
 
 ### 4. 타임아웃 시나리오
 
-```
-Client              Session              Timer
-   |                   |                    |
-   |-- CHAT_MESSAGE -->|                    |
-   |                   |                    |
-   |            [lastActivityTime           |
-   |             갱신: 10:00:00]            |
-   |                   |                    |
-   |                   |                    |--- CheckTimeout (10:00:05) --->
-   |                   |                    |    (timeSince = 5초, OK)
-   |                   |                    |
-   |  (30초 동안       |                    |
-   |   아무 메시지     |                    |
-   |   없음...)        |                    |
-   |                   |                    |
-   |                   |                    |--- CheckTimeout (10:00:35) --->
-   |                   |                    |    (timeSince = 35초, 타임아웃!)
-   |                   |<-- Disconnect() ---|
-   |                   |                    |
-   |            [연결 해제 및               |
-   |             리소스 정리]                |
-   |                   |                    |
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Session
+    participant Timer
+    
+    Client->>Session: CHAT_MESSAGE
+    activate Session
+    Note over Session: lastActivityTime 갱신<br/>10:00:00
+    deactivate Session
+    
+    Timer->>Session: CheckTimeout (10:00:05)
+    activate Session
+    Note over Session: timeSince = 5초<br/>OK
+    deactivate Session
+    
+    Note over Client,Timer: 30초 동안 아무 메시지 없음...
+    
+    Timer->>Session: CheckTimeout (10:00:35)
+    activate Session
+    Note over Session: timeSince = 35초<br/>타임아웃!
+    Session->>Session: Disconnect()
+    Note over Session: 연결 해제 및<br/>리소스 정리
+    deactivate Session
 ```
 
 ---
@@ -698,5 +864,5 @@ dotnet run
 
 ---
 
-**문서 작성일**: 2025-09-30
+**문서 작성일**: 2025-09-30  
 **버전**: 1.0.0
