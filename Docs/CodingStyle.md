@@ -292,5 +292,4 @@ public class ClassName
 
 ---
 
-**문서 작성일**: 2025-09-30
-**버전**: 1.0.0
+[⬅️ 서버 README로 돌아가기](../README.md)

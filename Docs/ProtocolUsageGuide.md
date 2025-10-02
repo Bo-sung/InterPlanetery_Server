@@ -289,112 +289,73 @@ Console.WriteLine($"[에러] {errorMessage}");
 
 ### 정상 연결 및 채팅 시퀀스
 
-```
-Client A                  Server                     Client B
-   |                         |                           |
-   |---TCP Connect---------->|                           |
-   |                         |                           |
-   |<--JOIN_SUCCESS(2001)----|                           |
-   |   sessionId: "abc12345" |                           |
-   |   roomInfo: ROOM_0001   |                           |
-   |   playerCount: 1/2      |                           |
-   |                         |                           |
-   |                         |<-----TCP Connect----------|
-   |                         |                           |
-   |<--USER_JOINED(2004)-----|---JOIN_SUCCESS(2001)----->|
-   |   userId: "xyz67890"    |   sessionId: "xyz67890"   |
-   |   playerCount: 2        |   roomInfo: ROOM_0001     |
-   |                         |   playerCount: 2/2        |
-   |                         |                           |
-   |---CHAT_MESSAGE(1003)--->|                           |
-   |   message: "안녕!"       |                           |
-   |                         |                           |
-   |<--CHAT_BROADCAST(2006)--|---CHAT_BROADCAST(2006)--->|
-   |   SenderId: "abc12345"  |   SenderId: "abc12345"    |
-   |   Message: "안녕!"       |   Message: "안녕!"         |
-   |                         |                           |
-   |                         |<--CHAT_MESSAGE(1003)------|
-   |                         |   message: "반가워요!"      |
-   |                         |                           |
-   |<--CHAT_BROADCAST(2006)--|---CHAT_BROADCAST(2006)--->|
-   |   SenderId: "xyz67890"  |   SenderId: "xyz67890"    |
-   |   Message: "반가워요!"   |   Message: "반가워요!"      |
-   |                         |                           |
+```mermaid
+sequenceDiagram
+    participant ClientA
+    participant Server
+    participant ClientB
+    ClientA->>Server: TCP Connect
+    Server-->>ClientA: JOIN_SUCCESS(2001)\n  sessionId: "abc12345"\n  roomInfo: ROOM_0001\n  playerCount: 1/2
+    ClientB->>Server: TCP Connect
+    Server-->>ClientB: JOIN_SUCCESS(2001)\n  sessionId: "xyz67890"\n  roomInfo: ROOM_0001\n  playerCount: 2/2
+    Server-->>ClientA: USER_JOINED(2004)\n  userId: "xyz67890"\n  playerCount: 2
+    ClientA->>Server: CHAT_MESSAGE(1003)\n  message: "안녕!"
+    Server-->>ClientA: CHAT_BROADCAST(2006)\n  SenderId: "abc12345"\n  Message: "안녕!"
+    Server-->>ClientB: CHAT_BROADCAST(2006)\n  SenderId: "abc12345"\n  Message: "안녕!"
+    ClientB->>Server: CHAT_MESSAGE(1003)\n  message: "반가워요!"
+    Server-->>ClientA: CHAT_BROADCAST(2006)\n  SenderId: "xyz67890"\n  Message: "반가워요!"
+    Server-->>ClientB: CHAT_BROADCAST(2006)\n  SenderId: "xyz67890"\n  Message: "반가워요!"
 ```
 
 ### 하트비트 시퀀스
 
-```
-Client                    Server
-   |                         |
-   |---HEARTBEAT(1004)------>|
-   |                         |--- 마지막 활동 시간 갱신
-   |                         |
-   |<--HEARTBEAT_ACK(2008)---|
-   |   serverTime: 12345678  |
-   |                         |
-   |                         |
-   |  ... (30초 경과) ...    |
-   |                         |
-   |---HEARTBEAT(1004)------>|
-   |                         |
-   |<--HEARTBEAT_ACK(2008)---|
-   |                         |
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    Client->>Server: HEARTBEAT(1004)
+    Server-->>Client: HEARTBEAT_ACK(2008)\n  serverTime: 12345678
+    Note over Client,Server: ... (30초 경과) ...
+    Client->>Server: HEARTBEAT(1004)
+    Server-->>Client: HEARTBEAT_ACK(2008)
 ```
 
 ### 타임아웃 시퀀스
 
-```
-Client                    Server
-   |                         |
-   |---HEARTBEAT(1004)------>|
-   |<--HEARTBEAT_ACK(2008)---|
-   |                         |
-   |                         |--- 마지막 활동: 0초
-   |                         |
-   |  ... (5초 경과) ...    |
-   |                         |
-   |                         |--- 타임아웃 체크
-   |                         |--- 경과 시간: 5초 (OK)
-   |                         |
-   |  ... (10초 경과) ...   |
-   |                         |
-   |                         |--- 타임아웃 체크
-   |                         |--- 경과 시간: 10초 (OK)
-   |                         |
-   |  ... (20초 경과) ...   |
-   |                         |
-   |                         |--- 타임아웃 체크
-   |                         |--- 경과 시간: 20초 (OK)
-   |                         |
-   |  ... (35초 경과) ...   |
-   |                         |
-   |                         |--- 타임아웃 체크
-   |                         |--- 경과 시간: 35초 (TIMEOUT!)
-   |                         |
-   |<--USER_LEFT-------------|--- (다른 플레이어에게)
-   |                         |
-   |   [연결 종료]           |--- Disconnect()
-   X                         |
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    Client->>Server: HEARTBEAT(1004)
+    Server-->>Client: HEARTBEAT_ACK(2008)
+    Note over Server: 마지막 활동: 0초
+    Note over Client,Server: ... (5초 경과) ...
+    Note over Server: 타임아웃 체크\n경과 시간: 5초 (OK)
+    Note over Client,Server: ... (10초 경과) ...
+    Note over Server: 타임아웃 체크\n경과 시간: 10초 (OK)
+    Note over Client,Server: ... (20초 경과) ...
+    Note over Server: 타임아웃 체크\n경과 시간: 20초 (OK)
+    Note over Client,Server: ... (35초 경과) ...
+    Note over Server: 타임아웃 체크\n경과 시간: 35초 (TIMEOUT!)
+    Server-->>Client: USER_LEFT (다른 플레이어에게)
+    Server->>Server: Disconnect()
+    Note over Client: [연결 종료]
+    Note over Client: X
 ```
 
 ### 퇴장 시퀀스
 
-```
-Client A                  Server                     Client B
-   |                         |                           |
-   |---LEAVE_ROOM(1002)----->|                           |
-   |   또는 메시지 "-1"        |                           |
-   |                         |                           |
-   |                         |--- 룸에서 제거             |
-   |                         |                           |
-   |<--LEAVE_SUCCESS(2003)---|---USER_LEFT(2005)-------->|
-   |   "You have left..."    |   userId: "abc12345"      |
-   |                         |   playerCount: 1          |
-   |                         |                           |
-   |   [연결 종료]           |                           |
-   X                         |                           |
-   |                         |                           |
+```mermaid
+sequenceDiagram
+    participant ClientA
+    participant Server
+    participant ClientB
+    ClientA->>Server: LEAVE_ROOM(1002) 또는 메시지 "-1"
+    Server->>Server: 룸에서 제거
+    Server-->>ClientA: LEAVE_SUCCESS(2003) "You have left..."
+    Server-->>ClientB: USER_LEFT(2005) userId: "abc12345" playerCount: 1
+    Note over ClientA: [연결 종료]
+    Note over ClientA: X
 ```
 
 ---
@@ -649,7 +610,4 @@ class Program
 
 ---
 
-## 버전 정보
-
-- **문서 버전**: 1.0
-- **작성일**: 2025-09-30
+[⬅️ 서버 README로 돌아가기](../README.md)
