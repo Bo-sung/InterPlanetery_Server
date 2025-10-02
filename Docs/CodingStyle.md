@@ -29,6 +29,10 @@ if (condition)
 {
     return;
 }
+
+// ✅ 올바른 예시 (바로 밑에 붙히기.)
+if (condition)
+    return;
 ```
 
 ### 코드 정리
@@ -61,6 +65,7 @@ async Task SendAsync() { }
 ### 3. 변수명
 - **camelCase** (소문자로 시작)
 - 의미 있는 이름 사용
+- 프로퍼티는 함수명과 동일
 
 ```csharp
 int count = 0;
