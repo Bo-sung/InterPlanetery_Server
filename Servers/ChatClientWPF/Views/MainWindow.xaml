@@ -3,134 +3,43 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:pages="clr-namespace:ChatClientWPF.Pages"
         mc:Ignorable="d"
-        Title="InterPlanetery Chat Client" Height="600" Width="900"
+        Title="InterPlanetery Test Tool" Height="650" Width="950"
         WindowStartupLocation="CenterScreen">
 
-    <Window.Resources>
-        <!-- 스타일 정의 -->
-        <Style x:Key="HeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,0,0,5"/>
-        </Style>
+    <Grid>
+        <!-- TabControl로 여러 테스트 페이지 관리 -->
+        <TabControl Margin="10">
+            <!-- Chat Test 탭 -->
+            <TabItem Header="Chat Test">
+                <Frame x:Name="ChatFrame" NavigationUIVisibility="Hidden">
+                    <Frame.Content>
+                        <pages:ChatPage/>
+                    </Frame.Content>
+                </Frame>
+            </TabItem>
 
-        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Margin" Value="5,0"/>
-        </Style>
+            <!-- 추가 테스트 탭 (향후 확장용) -->
+            <TabItem Header="Performance Test">
+                <Grid>
+                    <TextBlock Text="Performance Test Page (Coming Soon...)"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="16"
+                               Foreground="Gray"/>
+                </Grid>
+            </TabItem>
 
-        <Style x:Key="ButtonStyle" TargetType="Button">
-            <Setter Property="Padding" Value="15,5"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="MinWidth" Value="100"/>
-        </Style>
-    </Window.Resources>
-
-    <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- 연결 섹션 -->
-        <GroupBox Grid.Row="0" Header="Server Connection" Padding="10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="100"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0" Text="Host:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBox Grid.Column="1" x:Name="HostTextBox" Text="127.0.0.1" VerticalAlignment="Center"/>
-
-                <TextBlock Grid.Column="2" Text="Port:" VerticalAlignment="Center" Margin="20,0,10,0"/>
-                <TextBox Grid.Column="3" x:Name="PortTextBox" Text="7777" VerticalAlignment="Center"/>
-
-                <StackPanel Grid.Column="5" Orientation="Horizontal">
-                    <Button x:Name="ConnectButton" Content="Connect" Style="{StaticResource ButtonStyle}" Click="ConnectButton_Click"/>
-                    <Button x:Name="DisconnectButton" Content="Disconnect" Style="{StaticResource ButtonStyle}" Click="DisconnectButton_Click" IsEnabled="False"/>
-                </StackPanel>
-            </Grid>
-        </GroupBox>
-
-        <!-- 상태 바 -->
-        <Border Grid.Row="1" Background="#F0F0F0" Padding="10" Margin="0,10,0,0" CornerRadius="3">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0" Text="Connection:" FontWeight="Bold" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" x:Name="ConnectionStatusText" Text="Disconnected" Style="{StaticResource StatusTextStyle}" VerticalAlignment="Center" Foreground="Red"/>
-
-                <TextBlock Grid.Column="2" Text="User ID:" FontWeight="Bold" VerticalAlignment="Center" Margin="20,0,0,0"/>
-                <TextBlock Grid.Column="3" x:Name="UserIdText" Text="-" Style="{StaticResource StatusTextStyle}" VerticalAlignment="Center"/>
-
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                    <Button x:Name="JoinRoomButton" Content="Join Room" Width="100" Margin="5,0" Click="JoinRoomButton_Click" IsEnabled="False"/>
-                    <Button x:Name="LeaveRoomButton" Content="Leave Room" Width="100" Margin="5,0" Click="LeaveRoomButton_Click" IsEnabled="False"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- 채팅 영역 -->
-        <GroupBox Grid.Row="2" Header="Chat Room" Padding="10" Margin="0,10,0,0">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- 룸 정보 -->
-                <Border Grid.Row="0" Background="#E8F4F8" Padding="8" CornerRadius="3" Margin="0,0,0,5">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Room:" FontWeight="Bold" Margin="0,0,10,0"/>
-                        <TextBlock x:Name="RoomIdText" Text="Not in room" Foreground="#666"/>
-                        <TextBlock Text="Players:" FontWeight="Bold" Margin="30,0,10,0"/>
-                        <TextBlock x:Name="PlayerCountText" Text="0" Foreground="#666"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- 메시지 리스트 -->
-                <Border Grid.Row="1" BorderBrush="#CCC" BorderThickness="1" CornerRadius="3">
-                    <ScrollViewer x:Name="ChatScrollViewer" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="ChatMessagesPanel">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="5" Margin="2">
-                                        <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
-        </GroupBox>
-
-        <!-- 입력 영역 -->
-        <Grid Grid.Row="3" Margin="0,10,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <TextBox Grid.Column="0" x:Name="MessageTextBox"
-                     Height="30" VerticalContentAlignment="Center"
-                     IsEnabled="False" KeyDown="MessageTextBox_KeyDown"/>
-            <Button Grid.Column="1" x:Name="SendButton" Content="Send"
-                    Width="100" Margin="10,0,0,0" Click="SendButton_Click" IsEnabled="False"/>
-        </Grid>
+            <TabItem Header="Stress Test">
+                <Grid>
+                    <TextBlock Text="Stress Test Page (Coming Soon...)"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="16"
+                               Foreground="Gray"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
