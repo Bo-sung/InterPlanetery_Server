@@ -1,4 +1,6 @@
 using System.Windows;
+using ChatClientWPF.Pages;
+using ChatClientWPF.Presenters;
 
 namespace ChatClientWPF.Views
 {
@@ -24,6 +26,11 @@ namespace ChatClientWPF.Views
 		public MainWindow()
 		{
 			InitializeComponent();
+
+            // 맵 시각화 페이지 초기화
+            var mapPage = new MapDisplayPage();
+            var mapPresenter = new MapDisplayPresenter(mapPage);
+            MapFrame.Content = mapPage;
 		}
 	}
 }

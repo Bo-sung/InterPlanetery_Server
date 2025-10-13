@@ -20,6 +20,11 @@
                 </Frame>
             </TabItem>
 
+            <!-- Galaxy Map 탭 -->
+            <TabItem Header="Galaxy Map">
+                <Frame x:Name="MapFrame" NavigationUIVisibility="Hidden" />
+            </TabItem>
+
             <!-- 추가 테스트 탭 (향후 확장용) -->
             <TabItem Header="Performance Test">
                 <Grid>

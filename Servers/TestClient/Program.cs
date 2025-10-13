@@ -4,6 +4,9 @@ using TestClient;
 Console.WriteLine("=== InterPlanetery Chat Test Client ===");
 Console.WriteLine();
 
+// CSV 데이터 로딩 테스트
+TestCsvLoading();
+
 // 네트워크 클라이언트 생성
 NetworkClient client = new NetworkClient();
 bool isInRoom = false;
@@ -54,6 +57,64 @@ while (client.IsConnected)
 
 Console.WriteLine("Disconnected. Press any key to exit...");
 Console.ReadKey();
+
+
+// === CSV 데이터 로딩 테스트 메서드 ===
+void TestCsvLoading([System.Runtime.CompilerServices.CallerFilePath] string sourceFilePath = "")
+{
+    Console.WriteLine("--- Running CSV Data Loading Test ---");
+    try
+    {
+        // 이 소스 파일의 위치를 기준으로 TestData 폴더의 절대 경로를 계산
+        string sourceDir = System.IO.Path.GetDirectoryName(sourceFilePath);
+        string projectRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(sourceDir, "..", ".."));
+        string testDataDir = System.IO.Path.Combine(projectRoot, "Servers", "TestData");
+
+        string planetFilePath = System.IO.Path.Combine(testDataDir, "planets.csv");
+        string connectionFilePath = System.IO.Path.Combine(testDataDir, "connections.csv");
+
+        Console.WriteLine($"Attempting to load planets from: {planetFilePath}");
+
+        var planets = CsvDataManager.LoadData(planetFilePath, values =>
+            new Planet(
+                int.Parse(values[0]),
+                values[1],
+                Enum.Parse<PlanetType>(values[2]),
+                new Vector2(float.Parse(values[3]), float.Parse(values[4]))
+            )
+        );
+
+        var connections = CsvDataManager.LoadData(connectionFilePath, values =>
+            (from: int.Parse(values[0]), to: int.Parse(values[1]))
+        );
+
+        var mapData = new MapData("Solar System", planets, connections);
+
+        Console.WriteLine($"Successfully loaded map: '{mapData.MapName}'");
+        Console.WriteLine($"- Planets loaded: {mapData.Planets.Count}");
+        Console.WriteLine($"- Connections loaded: {mapData.Connections.Count}");
+
+        // 로직 레이어에서 Graph 생성 테스트
+        var mapGraph = new Graph<int>(isDirected: false);
+        var planetDict = mapData.Planets.ToDictionary(p => p.Id);
+        foreach (var p in mapData.Planets) mapGraph.AddNode(p.Id);
+        foreach (var c in mapData.Connections)
+        {
+            var p1 = planetDict[c.FromId];
+            var p2 = planetDict[c.ToId];
+            mapGraph.AddEdge(c.FromId, c.ToId, Vector2.Distance(p1.Position, p2.Position));
+        }
+
+        Console.WriteLine($"- Graph generated: {mapGraph.NodeCount} nodes, {mapGraph.EdgeCount} edges.");
+        Console.WriteLine("--- CSV Test Finished ---\n");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ERROR] CSV Loading Test Failed: {ex.Message}");
+        Console.WriteLine($"--- CSV Test Finished ---\n");
+    }
+}
+
 
 // 명령 처리
 async Task HandleCommand(string command)
