@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommonLib;
 
-namespace TestServer
+namespace BaseServer
 {
     /// <summary>
     /// 클라이언트 세션 관리 클래스

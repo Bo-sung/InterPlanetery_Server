@@ -28,11 +28,14 @@
 | **Phase 4** | 멀티플레이어 확장 | 정식 서비스 |
 
 ### 1.3 기술 스택
-- **언어**: C# (.NET 6.0+)
-- **서버 프레임워크**: ASP.NET Core (REST API) 또는 Unity Mirror (게임 서버)
-- **통신 프로토콜**: WebSocket / TCP
-- **데이터 포맷**: JSON
-- **테스트**: CLI 콘솔 애플리케이션
+- **언어**: C# (.NET 8.0)
+- **서버**: TCP 소켓 기반 게임 서버
+- **통신 프로토콜**: TCP / WebSocket
+- **직렬화**: 커스텀 바이너리 프로토콜 + JSON (CommonLib.Protocol)
+- **동기화 방식**: 락스텝(Lockstep)
+- **테스트 클라이언트**: WPF (MVP 패턴)
+- **공유 라이브러리**: CommonLib (Protocol, 데이터 모델)
+- **최종 클라이언트**: Unity (Phase 3)
 
 ---
 
@@ -40,52 +43,42 @@
 
 ### 2.1 전체 구조도
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    GAME SERVER                          │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │          Core Game Engine                        │  │
-│  │  - GameState Manager (게임 상태 총괄)            │  │
-│  │  - Game Loop (Tick 기반 업데이트)                │  │
-│  └──────────────────────────────────────────────────┘  │
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │   Map/       │  │   Fleet      │  │  Resource   │  │
-│  │   Planet     │  │   Manager    │  │  Manager    │  │
-│  │   Manager    │  │              │  │             │  │
-│  └──────────────┘  └──────────────┘  └─────────────┘  │
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │   Combat     │  │  Conquest    │  │     AI      │  │
-│  │   System     │  │  System      │  │  Controller │  │
-│  └──────────────┘  └──────────────┘  └─────────────┘  │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │          Command Processor                       │  │
-│  │  - 플레이어 명령 큐 관리                          │  │
-│  │  - 명령 유효성 검증                               │  │
-│  └──────────────────────────────────────────────────┘  │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │          Event System                            │  │
-│  │  - 게임 이벤트 발생 및 브로드캐스트               │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────┐
-│                  Network Layer                          │
-│  - WebSocket / TCP 서버                                 │
-│  - 클라이언트 세션 관리                                  │
-│  - 메시지 직렬화/역직렬화                                │
-└─────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────┐
-│               Unity Client (Multiple)                   │
-│  - Rendering & Animation                                │
-│  - Input Handling                                       │
-│  - UI/UX                                                │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph GameServer["게임 서버"]
+        CoreEngine["Core Game Engine<br/>- GameState Manager<br/>- Game Loop (Tick 기반)"]
+
+        subgraph Managers["게임 매니저들"]
+            MapMgr["Map/Planet<br/>Manager"]
+            FleetMgr["Fleet<br/>Manager"]
+            ResourceMgr["Resource<br/>Manager"]
+        end
+
+        subgraph Systems["게임 시스템들"]
+            Combat["Combat<br/>System"]
+            Conquest["Conquest<br/>System"]
+            AI["AI<br/>Controller"]
+        end
+
+        CmdProc["Command Processor<br/>- 명령 큐 관리<br/>- 유효성 검증"]
+        EventSys["Event System<br/>- 이벤트 발생<br/>- 브로드캐스트"]
+
+        CoreEngine --> Managers
+        CoreEngine --> Systems
+        CoreEngine --> CmdProc
+        CoreEngine --> EventSys
+    end
+
+    subgraph Network["네트워크 레이어"]
+        NetLayer["WebSocket/TCP 서버<br/>- 세션 관리<br/>- 직렬화/역직렬화"]
+    end
+
+    subgraph Clients["Unity 클라이언트들"]
+        Client["Unity Client<br/>- Rendering & Animation<br/>- Input Handling<br/>- UI/UX"]
+    end
+
+    GameServer <--> Network
+    Network <--> Clients
 ```
 
 ### 2.2 설계 원칙
@@ -99,6 +92,7 @@
 - 동일한 초기 상태 + 동일한 입력 = 동일한 결과
 - 리플레이 기능 구현 가능
 - 디버깅 용이
+- **락스텝(Lockstep) 동기화 사용**: 모든 클라이언트가 동일한 틱에서 동일한 명령 실행
 
 #### 2.2.3 명령 패턴 (Command Pattern)
 - 모든 플레이어 행동은 Command 객체로 캡슐화
@@ -123,59 +117,71 @@
 
 #### 3.1.1 Planet (행성)
 
-| 속성 | 타입 | 설명 |
-|------|------|------|
-| Id | string | 고유 식별자 (UUID) |
-| Name | string | 행성 이름 |
-| Position | Vector2 | 맵 좌표 (x, y) |
-| OwnerId | string? | 소유 플레이어 ID (null = 중립) |
-| ConquestProgress | float | 점령도 (0~100) |
-| Resources | ResourceBonus | 제공 자원 |
-| GarrisonFleetId | string? | 주둔 함대 ID |
-| AdjacentPlanetIds | List<string> | 인접 행성 ID 목록 |
-| IsHomeworld | bool | 모성 여부 |
+**DB 테이블: `planet_info`, `map_planets`, `planet_routes`**
 
-**ResourceBonus 구조**
-- MineralPerSecond: int (광물 생산량/초)
-- GasPerSecond: int (가스 생산량/초)
-- SupplyCapacity: int (보급품 최대치 증가량)
+| 속성 | 타입 | 설명 | DB 매핑 |
+|------|------|------|---------|
+| Id | int | 행성 ID | planet_info.id |
+| Name | string | 행성 이름 | planet_info.name |
+| Position | Vector2 | 맵 좌표 (x, y) | map_planets.position_x, position_y |
+| Mineral | int | 광물 생산량/초 | planet_info.mineral |
+| Gas | int | 가스 생산량/초 | planet_info.gas |
+| Supply | int | 보급품 증가량 | planet_info.supply |
+| AdjacentPlanetIds | List\<int\> | 인접 행성 ID 목록 | planet_routes |
+
+**런타임 데이터 (DB 미저장, 메모리만)**
+- OwnerId: int? (소유 플레이어 ID, null = 중립)
+- ConquestProgress: float (점령도 0~100)
+- GarrisonFleetId: int? (주둔 함대 ID)
+
+**모성(Homeworld) 판정**
+- `maps` 테이블의 `player1_homeworld_id`, `player2_homeworld_id`로 판정
+- 맵별로 다른 행성을 모성으로 지정 가능
+
+**모성의 특수 기능**
+- **함대 생산**: 모든 함대는 오직 모성에서만 생산 가능
+- **승패 조건**: 상대 모성을 점령하면 승리
+- **초기 자원**: 게임 시작 시 안정적인 자원 제공
 
 #### 3.1.2 Fleet (함대)
 
+**런타임 데이터 (DB 미저장, 게임 메모리에서만 관리)**
+
 | 속성 | 타입 | 설명 |
 |------|------|------|
-| Id | string | 고유 식별자 |
+| Id | int | 함대 ID (게임 내 자동 증가) |
 | Type | FleetType | 함대 종류 (Scout/Fighter/Cruiser/Battleship) |
-| OwnerId | string | 소유 플레이어 ID |
+| OwnerId | int | 소유 플레이어 ID (1 또는 2) |
 | CurrentHealth | int | 현재 체력 |
 | MaxHealth | int | 최대 체력 |
 | AttackPower | int | 공격력 |
 | MoveSpeed | float | 이동 속도 |
 | Location | FleetLocation | 위치 정보 |
 | State | FleetState | 상태 (Idle/Garrison/Moving/InCombat/Constructing) |
-| ControlGroupNumber | int? | 부대 번호 (1~5) |
 
 **FleetLocation 구조**
 - Type: LocationType (OnPlanet / InTransit)
-- PlanetId: string (행성에 있을 때)
+- PlanetId: int (행성에 있을 때)
 - Route: RouteInfo (이동 중일 때)
-  - FromPlanetId: string
-  - ToPlanetId: string
+  - FromPlanetId: int
+  - ToPlanetId: int
   - Progress: float (0~1)
   - StartTime: float
 
 #### 3.1.3 Player (플레이어)
 
+**런타임 데이터 (DB 미저장, 게임 메모리에서만 관리)**
+
 | 속성 | 타입 | 설명 |
 |------|------|------|
-| Id | string | 고유 식별자 |
+| Id | int | 플레이어 ID (1 또는 2) |
 | Name | string | 플레이어 이름 |
 | Type | PlayerType | Human / AI |
 | Resources | ResourcePool | 보유 자원 |
-| OwnedPlanetIds | List<string> | 소유 행성 목록 |
-| HomeworldId | string | 모성 ID |
-| FleetIds | List<string> | 소유 함대 목록 |
-| ProductionQueue | Queue<ProductionOrder> | 생산 대기열 |
+| OwnedPlanetIds | List\<int\> | 소유 행성 ID 목록 |
+| HomeworldId | int | 모성 ID (맵에서 가져옴) |
+| FleetIds | List\<int\> | 소유 함대 ID 목록 |
+| ProductionQueue | Queue\<ProductionOrder\> | 생산 대기열 |
 | IsDefeated | bool | 패배 여부 |
 
 **ResourcePool 구조**
@@ -188,21 +194,49 @@
 
 #### 3.1.4 GameState (게임 상태)
 
+**런타임 데이터 (DB 미저장, 게임 메모리에서만 관리)**
+
 | 속성 | 타입 | 설명 |
 |------|------|------|
-| GameId | string | 게임 세션 ID |
+| GameId | int | 게임 세션 ID |
 | Phase | GamePhase | 게임 단계 (Lobby/Loading/Playing/Ended) |
 | GameTime | float | 경과 시간 (초) |
 | TickCount | long | 틱 카운터 |
-| MapId | string | 맵 ID |
-| Players | Dictionary<string, Player> | 플레이어 목록 |
-| Planets | Dictionary<string, Planet> | 행성 목록 |
-| Fleets | Dictionary<string, Fleet> | 함대 목록 |
-| WinnerId | string? | 승자 ID |
+| MapId | int | 맵 ID (maps.id) |
+| Players | Dictionary\<int, Player\> | 플레이어 목록 (Key: 1, 2) |
+| Planets | Dictionary\<int, Planet\> | 행성 목록 (Key: planet_id) |
+| Fleets | Dictionary\<int, Fleet\> | 함대 목록 (Key: fleet_id) |
+| WinnerId | int? | 승자 ID (1 또는 2) |
 
-### 3.2 게임 설정 (Config)
+**맵 데이터 로드**
+- 게임 시작 시 `maps`, `map_planets`, `planet_routes` 테이블에서 로드
+- `player1_homeworld_id`, `player2_homeworld_id`를 통해 각 플레이어의 모성 설정
 
-#### 3.2.1 FleetConfig (함대 종류별 설정)
+### 3.2 데이터베이스 구조
+
+게임에 필요한 맵 데이터는 MySQL DB에 저장하며, 게임 상태는 메모리에서만 관리합니다.
+
+#### 3.2.1 DB 테이블 구조
+
+**참고 문서**: [#DB DDL 모음.sql](../#DB%20DDL%20모음.sql)
+
+**사용하는 테이블**:
+- `maps` - 맵 정보 (player1_homeworld_id, player2_homeworld_id 포함)
+- `planet_info` - 행성 정보 (name, mineral, gas, supply)
+- `map_planets` - 맵별 행성 배치 (position_x, position_y)
+- `planet_routes` - 행성 간 연결 정보
+
+#### 3.2.2 게임 시작 시 맵 로드 절차
+
+1. `maps` 테이블에서 선택한 맵 정보 로드
+2. `map_planets`에서 해당 맵의 행성 배치 로드
+3. `planet_info`에서 각 행성의 자원 정보 로드
+4. `planet_routes`에서 행성 간 연결 정보 로드
+5. `player1_homeworld_id`, `player2_homeworld_id`로 각 플레이어의 모성 설정
+
+### 3.3 게임 설정 (Config)
+
+#### 3.3.1 FleetConfig (함대 종류별 설정)
 
 | 함대 타입 | 체력 | 공격력 | 이동속도 | 광물 | 가스 | 보급 | 생산시간 |
 |----------|------|--------|----------|------|------|------|----------|
@@ -240,24 +274,20 @@
 - 모든 시스템을 순차적으로 실행
 
 #### 4.1.2 업데이트 순서
-```
-1. 명령 처리 (Command Processing)
-   ↓
-2. 자원 생산 (Resource Production)
-   ↓
-3. 함대 생산 (Fleet Production)
-   ↓
-4. 함대 이동 (Fleet Movement)
-   ↓
-5. 전투 처리 (Combat Resolution)
-   ↓
-6. 점령 처리 (Conquest Update)
-   ↓
-7. AI 업데이트 (AI Decision Making)
-   ↓
-8. 승리 조건 확인 (Victory Check)
-   ↓
-9. 이벤트 브로드캐스트 (Event Broadcasting)
+
+```mermaid
+flowchart TD
+    A[1. 명령 처리<br/>Command Processing]
+    B[2. 자원 생산<br/>Resource Production]
+    C[3. 함대 생산<br/>Fleet Production]
+    D[4. 함대 이동<br/>Fleet Movement]
+    E[5. 전투 처리<br/>Combat Resolution]
+    F[6. 점령 처리<br/>Conquest Update]
+    G[7. AI 업데이트<br/>AI Decision Making]
+    H[8. 승리 조건 확인<br/>Victory Check]
+    I[9. 이벤트 브로드캐스트<br/>Event Broadcasting]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I
 ```
 
 #### 4.1.3 틱 관리
@@ -284,12 +314,14 @@
 
 ### 4.3 Fleet Production System
 
+**중요**: 모든 함대는 **오직 모성에서만** 생산 가능
+
 #### 4.3.1 생산 요청 처리
 
 **검증 단계**
 1. 자원 충분 여부 확인
 2. 보급품 여유 확인
-3. 모성에 함대 주둔 여부 확인
+3. **모성에 함대 주둔 여부 확인** (모성에 이미 함대가 있으면 생산 불가)
 4. 이미 생산 중인지 확인
 
 **생산 시작**
@@ -304,9 +336,9 @@
 
 **완료 시**
 1. Queue에서 제거
-2. 모성에 함대 생성
+2. **모성에** 함대 생성 (다른 행성에서는 생성 불가)
 3. 함대 ID를 플레이어에게 추가
-4. 모성 GarrisonFleetId 설정
+4. 모성의 GarrisonFleetId 설정
 5. 이벤트 발생
 
 #### 4.3.3 생산 취소
@@ -318,9 +350,15 @@
 #### 4.4.1 이동 명령 검증
 
 **실패 조건**
-- 이미 이동 중인 함대
-- 인접하지 않은 행성
-- 타인 소유 함대
+1. 이미 이동 중인 함대
+2. **직행 경로가 존재하지 않음** (`planet_routes`에 출발-도착 경로 없음)
+3. **목적지에 아군 함대가 이미 주둔 중** (같은 플레이어 소유 함대 있음)
+4. 타인 소유 함대
+
+**성공 조건**
+- 출발지와 목적지 사이에 직행 경로 존재 (`planet_routes` 확인)
+- 목적지에 아군 함대 없음 (적군 함대는 OK - 전투 발생)
+- 목적지가 비어있음 (OK - 주둔 시작)
 
 **성공 시**
 1. 상태를 Moving으로 변경
@@ -345,25 +383,34 @@
 
 **경우의 수**
 1. **행성에 적 함대 있음** → 전투 시작
-2. **행성에 아군 함대 있음** → 출발지로 복귀
-3. **행성이 비어있음** → 주둔 시작
+2. **행성에 아군 함대 있음** → 이동 불가 (이미 검증 단계에서 차단됨)
+3. **행성이 비어있음** → 주둔 시작 (점령 진행)
 
-#### 4.4.4 이동 중 충돌
+#### 4.4.4 이동 중 충돌 (경로 상 교전)
 
 **감지 조건**
-- 같은 두 행성을 연결하는 경로
+- 같은 경로를 사용 중 (같은 두 행성 연결)
 - 반대 방향 이동
 - 진행도가 비슷함 (±10%)
 
 **충돌 처리**
-- **아군 함대**: 둘 다 출발지로 복귀
-- **적군 함대**: 중간 지점에서 전투 시작
+- **아군 함대**: 발생하지 않음 (검증 단계에서 차단)
+- **적군 함대**: 경로 중간 지점에서 전투 시작
 
 ### 4.5 Combat System
 
 #### 4.5.1 전투 시작 조건
-- 행성 도착 시 적 함대 존재
-- 이동 중 적 함대와 충돌
+
+**전투는 두 가지 장소에서 발생**:
+
+1. **행성에서의 전투**
+   - 함대가 행성에 도착했을 때 적 함대가 주둔 중
+   - 예: Player 1 함대가 Planet A에 도착 → Planet A에 Player 2 함대 존재 → 전투
+
+2. **경로에서의 전투**
+   - 같은 경로에서 양측 함대가 반대 방향으로 이동 중
+   - 진행도가 비슷할 때 (±10%) 중간 지점에서 충돌
+   - 예: Fleet A (Planet 1 → 2) vs Fleet B (Planet 2 → 1)
 
 #### 4.5.2 전투 진행
 
@@ -386,12 +433,17 @@
 1. Fleets에서 제거
 2. Player.FleetIds에서 제거
 3. 보급품 반환
-4. 행성 GarrisonFleetId 제거
+4. 행성 GarrisonFleetId 제거 (행성 전투인 경우)
 5. 이벤트 발생
 
-**승리 함대**
-- 행성에서 전투: 해당 행성 주둔
-- 이동 중 전투: 원래 목적지로 계속 이동
+**승리 함대 처리**
+1. **행성에서의 전투**
+   - 승리 함대가 해당 행성에 주둔
+   - 점령 진행 시작
+
+2. **경로에서의 전투**
+   - 승리 함대는 원래 목적지로 계속 이동
+   - 이동 완료 후 도착 행성 처리 (주둔 또는 추가 전투)
 
 ### 4.6 Conquest System
 
@@ -436,7 +488,7 @@
 
 **판단 순서**
 1. 이미 생산 중? → 중단
-2. 모성에 함대 있음? → 중단
+2. **모성에 함대 있음?** → 중단 (모성이 비어야 생산 가능)
 3. 생산 가능한 함대 목록 조회 (강력한 순)
 4. 자원 충족하는 가장 강력한 함대 생산
 
@@ -445,6 +497,8 @@
 2. Cruiser
 3. Fighter
 4. Scout
+
+**참고**: 함대는 오직 모성에서만 생산되므로, 모성에 함대가 주둔 중이면 새로운 함대를 생산할 수 없음
 
 #### 4.7.3 함대 명령 로직
 
@@ -482,136 +536,375 @@
 
 ---
 
-## 5. CLI 테스트 환경
+## 5. WPF 테스트 클라이언트
 
-### 5.1 CLI 구조
+### 5.1 개요
 
-#### 5.1.1 실행 모드
-```
-┌─────────────────────────────────────┐
-│         Main Menu                   │
-├─────────────────────────────────────┤
-│  1. New Game (vs AI)                │
-│  2. Load Game                       │
-│  3. Settings                        │
-│  4. Exit                            │
-└─────────────────────────────────────┘
-```
+**목적**
+- 서버의 각 기능을 독립적으로 테스트
+- 게임 로직 검증 및 디버깅
+- 네트워크 프로토콜 테스트
+- 시각적 피드백을 통한 상태 확인
 
-#### 5.1.2 게임 화면 레이아웃
-```
-================== INTERPLANETARY CLI ==================
-Game Time: 00:05:32          Tick: 6640
+**기술 스택**
+- **.NET 8.0**
+- **WPF (Windows Presentation Foundation)**
+- **MVP 패턴 (Model-View-Presenter)** - ChatClientWPF와 동일
+- **CommonLib** 공유 라이브러리
+  - Protocol 클래스: 바이너리/JSON 직렬화
+  - 게임 데이터 모델 (Planet, Fleet, Player, GameState)
+- **TCP 소켓 통신** (비동기 I/O)
 
-┌─────────────── RESOURCES ───────────────┐
-│ Minerals: 450 (+15/s)                   │
-│ Gas: 120 (+5/s)                         │
-│ Supply: 12/25                           │
-└─────────────────────────────────────────┘
+**참고 프로젝트**: [ChatClientWPF](../Guides/ChatClientWPF%20-%20MVP%20패턴%20채팅%20클라이언트.md)
 
-┌─────────────── MAP ─────────────────────┐
-│  [P1: Alpha★]──[P2: Beta]               │
-│       │            │                     │
-│  [P3: Gamma]──[P4: Delta★]              │
-│                                          │
-│  ★ = Homeworld                          │
-│  [ ] = Neutral  [P] = Player            │
-│  [A] = AI                                │
-└─────────────────────────────────────────┘
+### 5.2 테스트 모듈 구조
 
-┌─────────────── FLEETS ──────────────────┐
-│  1. Scout     @ Alpha    [HP: 50/50]    │
-│  2. Fighter   → Beta     [Moving 45%]   │
-│  3. Cruiser   @ Gamma    [HP: 180/200]  │
-└─────────────────────────────────────────┘
+WPF 클라이언트는 여러 독립적인 테스트 모듈로 구성:
 
-┌─────────────── PRODUCTION ──────────────┐
-│  Battleship building... [25s remaining]  │
-└─────────────────────────────────────────┘
+```mermaid
+graph TB
+    Main[메인 화면<br/>Test Module Selector]
 
-┌─────────────── COMMANDS ────────────────┐
-│  [P] Produce  [M] Move  [S] Status      │
-│  [G] Control Group  [N] Next Turn       │
-│  [Q] Quit                                │
-└─────────────────────────────────────────┘
-
->
+    Main --> Conn[연결 테스트<br/>Connection Test]
+    Main --> Resource[자원 시스템 테스트<br/>Resource Test]
+    Main --> Fleet[함대 생산 테스트<br/>Fleet Production Test]
+    Main --> Move[함대 이동 테스트<br/>Movement Test]
+    Main --> Combat[전투 시스템 테스트<br/>Combat Test]
+    Main --> Conquest[점령 시스템 테스트<br/>Conquest Test]
+    Main --> Full[통합 게임 테스트<br/>Full Game Test]
 ```
 
-### 5.2 명령어 시스템
+#### 5.2.1 메인 화면 (Test Module Selector)
 
-#### 5.2.1 생산 명령 (P)
+**UI 구성**
+- 테스트 모듈 목록 (ListBox)
+- 서버 연결 상태 표시
+- 로그 출력 영역
+
+#### 5.2.2 연결 테스트 (Connection Test)
+
+**테스트 항목**
+- TCP/WebSocket 연결 수립
+- 하트비트 송수신
+- 재연결 처리
+- 타임아웃 시나리오
+
+**UI 요소**
+- 서버 주소/포트 입력
+- Connect/Disconnect 버튼
+- 연결 상태 표시
+- 송수신 패킷 로그
+
+#### 5.2.3 자원 시스템 테스트 (Resource Test)
+
+**테스트 항목**
+- 초기 자원 설정
+- 자원 생산률 계산
+- 행성 추가 시 자원 증가
+- 보급품 관리
+
+**UI 요소**
+- 현재 자원 표시 (Minerals, Gas, Supply)
+- 생산률 표시 (+N/s)
+- 행성 추가/제거 버튼
+- 시간 경과 시뮬레이션
+
+#### 5.2.4 함대 생산 테스트 (Fleet Production Test)
+
+**테스트 항목**
+- 각 함대 타입 생산 (Scout, Fighter, Cruiser, Battleship)
+- 자원 소비 및 부족 처리
+- 생산 큐 관리
+- 생산 완료 처리
+
+**UI 요소**
+- 함대 타입 선택 (ComboBox)
+- Produce 버튼
+- 생산 큐 목록
+- 진행 상황 표시 (ProgressBar)
+- 생산된 함대 목록
+
+#### 5.2.5 함대 이동 테스트 (Movement Test)
+
+**테스트 항목**
+- 인접 행성으로 이동
+- 비인접 행성 이동 거부
+- 이동 진행도 계산
+- 도착 처리
+
+**UI 요소**
+- 맵 시각화 (Canvas)
+- 행성 노드 표시
+- 함대 위치 표시
+- 이동 경로 애니메이션
+- 함대 선택 및 목적지 클릭
+
+#### 5.2.6 전투 시스템 테스트 (Combat Test)
+
+**테스트 항목**
+- 함대 간 전투 시작
+- 데미지 계산
+- 전투 종료 조건
+- 승패 판정
+
+**UI 요소**
+- 전투 시나리오 설정
+- 양측 함대 정보 (체력, 공격력)
+- 전투 진행 애니메이션
+- 전투 로그
+- 결과 표시
+
+#### 5.2.7 점령 시스템 테스트 (Conquest Test)
+
+**테스트 항목**
+- 중립 행성 점령
+- 적 행성 점령
+- 점령도 계산
+- 소유권 변경
+
+**UI 요소**
+- 행성 상태 표시 (소유자, 점령도)
+- 함대 주둔 시뮬레이션
+- 점령도 진행 바
+- 소유권 변경 이벤트 로그
+
+#### 5.2.8 통합 게임 테스트 (Full Game Test)
+
+**테스트 항목**
+- AI 대전 시뮬레이션
+- 전체 게임 플레이
+- 승패 조건 확인
+- 게임 종료 처리
+
+**UI 요소**
+- 실시간 맵 뷰
+- 자원 HUD
+- 함대 목록
+- 명령 입력 패널
+- 게임 이벤트 로그
+- Pause/Resume 기능
+
+### 5.3 WPF 아키텍처
+
+#### 5.3.1 MVP 패턴 적용 (ChatClientWPF 기반)
+
+**프로젝트 구조**
 ```
-> P
-Select fleet type:
-  1. Scout (50M, 0G, 1S) - 5s
-  2. Fighter (100M, 25G, 2S) - 10s
-  3. Cruiser (200M, 75G, 3S) - 20s
-  4. Battleship (400M, 150G, 5S) - 40s
-  0. Cancel
->
+InterplanetaryTestClient/
+├── Models/                        # Model 계층
+│   └── GameClientModel.cs         # 네트워크 로직, 게임 로직
+├── Views/                         # View 계층
+│   ├── ITestView.cs               # View 인터페이스 (계약)
+│   ├── MainWindow.xaml            # 메인 UI
+│   ├── MainWindow.xaml.cs         # View 구현
+│   └── Modules/                   # 테스트 모듈별 View
+│       ├── ResourceTestView.xaml
+│       ├── FleetTestView.xaml
+│       └── ...
+└── Presenters/                    # Presenter 계층
+    ├── MainPresenter.cs           # 메인 Presenter
+    └── ModulePresenters/          # 모듈별 Presenter
+        ├── ResourceTestPresenter.cs
+        ├── FleetTestPresenter.cs
+        └── ...
 ```
 
-#### 5.2.2 이동 명령 (M)
-```
-> M
-Select fleet (ID or control group):
-> 1
-
-Current location: Alpha
-Adjacent planets:
-  1. Beta (Neutral, 50% conquered)
-  2. Gamma (Player)
-Select destination:
-> 1
-
-Fleet #1 moving Alpha → Beta
+**MVP 패턴 흐름**
+```mermaid
+graph TB
+    User[사용자 입력] --> View[View<br/>XAML UI]
+    View -->|이벤트| Presenter[Presenter<br/>중재자]
+    Presenter -->|메서드 호출| Model[Model<br/>GameClientModel]
+    Model -->|서버 통신| Server[Game Server]
+    Server -->|응답| Model
+    Model -->|이벤트 발생| Presenter
+    Presenter -->|UI 업데이트| View
+    View --> User
 ```
 
-#### 5.2.3 상태 조회 (S)
+**역할 분리 (ChatClientWPF와 동일)**
+
+**📦 Model (GameClientModel)**
+- 비즈니스 로직과 데이터 관리
+- TCP/WebSocket 네트워크 연결
+- Protocol 직렬화/역직렬화 (CommonLib 사용)
+- 서버 명령 전송 (생산, 이동, 전투 등)
+- 이벤트 발생 (자원 업데이트, 함대 생성, 전투 결과 등)
+- View에 대해 무지
+
+**🎨 View (ITestView, MainWindow)**
+- UI 표시 및 사용자 입력 수신
+- XAML로 정의된 UI
+- 사용자 입력 이벤트 발생
+- Presenter 요청에 따른 UI 업데이트
+- Model을 직접 참조하지 않음
+
+**🎯 Presenter**
+- View와 Model 사이의 중재자
+- View 이벤트 → Model 메서드 호출 변환
+- Model 이벤트 → View UI 업데이트 변환
+- UI 로직 처리 (상태 관리, 검증)
+
+#### 5.3.2 Model 구현 (GameClientModel)
+
+**GameClientModel.cs 구조**
+```csharp
+public class GameClientModel
+{
+    private TcpClient? _client;
+    private NetworkStream? _stream;
+
+    // Model이 발생시키는 이벤트 (ChatClientWPF 패턴)
+    public event Action<bool, string>? OnConnectionChanged;
+    public event Action<ResourceUpdate>? OnResourcesUpdated;
+    public event Action<Fleet>? OnFleetSpawned;
+    public event Action<FleetMoveEvent>? OnFleetMoving;
+    public event Action<CombatResult>? OnCombatEnded;
+    public event Action<PlanetCaptured>? OnPlanetCaptured;
+    public event Action<string>? OnErrorOccurred;
+
+    // 연결 관리
+    public async Task<bool> ConnectAsync(string host, int port);
+    public void Disconnect();
+
+    // 게임 명령 전송
+    public async Task ProduceFleetAsync(FleetType type);
+    public async Task MoveFleetAsync(int fleetId, int targetPlanetId);
+
+    // 락스텝 동기화
+    public void RegisterCommandForTick(int tickNumber, Protocol command);
+
+    // 프로토콜 수신 루프
+    private async Task ReceiveLoopAsync();
+    private void HandleProtocol(Protocol protocol);
+}
 ```
-> S
-Select:
-  1. Planet details
-  2. Fleet details
-  3. Player stats
-  4. Game summary
->
+
+**이벤트 데이터 모델**
+```csharp
+// ChatClientWPF의 ChatMessage와 유사한 구조
+public struct ResourceUpdate
+{
+    public float Minerals { get; set; }
+    public float Gas { get; set; }
+    public int CurrentSupply { get; set; }
+    public int MaxSupply { get; set; }
+}
+
+public struct FleetMoveEvent
+{
+    public int FleetId { get; set; }
+    public int FromPlanetId { get; set; }
+    public int ToPlanetId { get; set; }
+    public float Progress { get; set; }
+}
 ```
 
-#### 5.2.4 부대 지정 (G)
+#### 5.3.3 View 인터페이스 (ITestView)
+
+**ITestView.cs 계약 정의**
+```csharp
+// ChatClientWPF의 IChatView와 동일한 패턴
+public interface ITestView
+{
+    // View가 발생시키는 이벤트 (사용자 입력)
+    event Action<string, int>? OnConnectRequested;
+    event Action? OnDisconnectRequested;
+    event Action<FleetType>? OnProduceFleetRequested;
+    event Action<int, int>? OnMoveFleetRequested;  // fleetId, targetPlanetId
+
+    // Presenter가 호출하는 메서드 (UI 업데이트)
+    void ShowConnectionStatus(bool isConnected, string message);
+    void UpdateResources(ResourceUpdate resources);
+    void AddFleetToList(Fleet fleet);
+    void UpdateFleetPosition(FleetMoveEvent moveEvent);
+    void ShowCombatResult(CombatResult result);
+    void ShowError(string message);
+}
 ```
-> G
-Select fleet:
-> 1
 
-Assign to control group (1-5):
-> 1
+#### 5.3.4 Presenter 구현
 
-Fleet #1 assigned to group 1
+**ResourceTestPresenter.cs 예시**
+```csharp
+public class ResourceTestPresenter
+{
+    private readonly IResourceTestView _view;
+    private readonly GameClientModel _model;
+
+    public ResourceTestPresenter(IResourceTestView view, GameClientModel model)
+    {
+        _view = view;
+        _model = model;
+
+        // View 이벤트 구독 (사용자 입력 처리)
+        _view.OnSetResourcesRequested += HandleSetResourcesRequested;
+        _view.OnAddPlanetRequested += HandleAddPlanetRequested;
+
+        // Model 이벤트 구독 (서버 응답 처리)
+        _model.OnResourcesUpdated += HandleResourcesUpdated;
+    }
+
+    // View → Model
+    private void HandleSetResourcesRequested(float minerals, float gas)
+    {
+        // 유효성 검증
+        if (minerals < 0 || gas < 0)
+        {
+            _view.ShowError("Resources cannot be negative");
+            return;
+        }
+
+        // Model 호출
+        _model.SetResourcesAsync(minerals, gas);
+    }
+
+    // Model → View
+    private void HandleResourcesUpdated(ResourceUpdate resources)
+    {
+        // UI 업데이트
+        _view.UpdateResources(resources);
+        _view.ShowMessage($"Resources updated: M={resources.Minerals}, G={resources.Gas}");
+    }
+}
 ```
 
-#### 5.2.5 시간 진행
+**MVP 패턴의 장점 (ChatClientWPF 가이드 참조)**
+1. **관심사의 분리**: Model, View, Presenter 각각 명확한 책임
+2. **테스트 용이성**: View를 Mock으로 대체하여 Presenter 단위 테스트 가능
+3. **유지보수성**: 각 계층 독립적으로 수정 가능
+4. **재사용성**: Model은 다른 View(CLI, Unity 등)에서 재사용 가능
 
-**실시간 모드** (Phase 1)
-- 자동으로 틱 진행
-- 0.05초마다 업데이트
-- 명령은 언제든 입력 가능
+#### 5.3.5 테스트 자동화
 
-**턴 기반 모드** (Phase 1 대체안)
-- N 키로 수동 틱 진행
-- 각 턴마다 1초 시뮬레이션
-- 디버깅 용이
+**단위 테스트 지원**
+- 각 테스트 모듈은 독립 실행 가능
+- 예상 결과와 실제 결과 비교
+- 자동화된 테스트 시나리오 실행
 
-### 5.3 디버그 기능
+**테스트 스크립트 예시**
+```json
+{
+  "testName": "Fleet Production Test",
+  "steps": [
+    {"action": "SetResources", "minerals": 1000, "gas": 500},
+    {"action": "ProduceFleet", "type": "Scout"},
+    {"action": "WaitSeconds", "duration": 5},
+    {"action": "AssertFleetCount", "expected": 1},
+    {"action": "AssertResources", "minerals": 950, "gas": 500}
+  ]
+}
+```
 
-#### 5.3.1 로그 레벨
+### 5.4 디버그 기능
+
+#### 5.4.1 로그 레벨
 - **ERROR**: 치명적 오류
 - **WARN**: 경고 (명령 실패 등)
 - **INFO**: 주요 이벤트 (함대 생산, 행성 점령)
 - **DEBUG**: 상세 정보 (틱마다 상태)
 
-#### 5.3.2 저장/불러오기
+#### 5.4.2 저장/불러오기
 
 **저장 형식**: JSON
 ```json
@@ -625,29 +918,42 @@ Fleet #1 assigned to group 1
 }
 ```
 
-#### 5.3.3 치트 명령 (개발용)
-- `/god` - 무한 자원
-- `/spawn <type>` - 즉시 함대 생성
-- `/tp <fleet> <planet>` - 순간이동
-- `/win` - 즉시 승리
+**WPF UI**
+- Save/Load 버튼
+- 파일 선택 다이얼로그
+- 저장 슬롯 관리
 
-### 5.4 테스트 시나리오
+#### 5.4.3 개발자 도구
 
-#### 5.4.1 기본 기능 테스트
+**치트 기능**
+- 무한 자원 활성화
+- 즉시 함대 생성
+- 함대 순간이동
+- 승리/패배 강제 설정
+
+**디버그 패널**
+- 현재 틱 번호 표시
+- 네트워크 지연 시뮬레이션
+- 패킷 로깅
+- 상태 덤프 (JSON 출력)
+
+### 5.5 테스트 시나리오
+
+#### 5.5.1 기본 기능 테스트
 1. **자원 생산**: 1분간 대기 후 자원 증가 확인
 2. **함대 생산**: 각 타입별 생산 및 생성 확인
 3. **함대 이동**: 인접/비인접 행성 이동 테스트
 4. **전투**: 적 함대와 조우 시 전투 결과
 5. **점령**: 중립/적 행성 점령 과정
 
-#### 5.4.2 엣지 케이스 테스트
+#### 5.5.2 엣지 케이스 테스트
 1. **자원 부족**: 생산 시도 → 거부
 2. **동시 도착**: 두 함대가 같은 행성 도착
 3. **중간 충돌**: 반대 방향 이동 함대
 4. **모성 방어**: AI가 모성 공격 시
 5. **생산 중 모성 점령**: 생산 큐 처리
 
-#### 5.4.3 성능 테스트
+#### 5.5.3 성능 테스트
 - 100개 행성, 200개 함대 동시 시뮬레이션
 - 1시간 실시간 게임 안정성
 - 저장/불러오기 대용량 데이터
@@ -689,7 +995,7 @@ Fleet #1 assigned to group 1
   "messageType": "Command",
   "commandType": "Connect",
   "payload": {
-    "playerId": "player_123",
+    "playerId": 1,
     "playerName": "Player1",
     "authToken": "jwt_token_here"
   }
@@ -702,8 +1008,8 @@ Fleet #1 assigned to group 1
   "messageType": "Command",
   "commandType": "JoinGame",
   "payload": {
-    "gameId": "game_456",
-    "teamId": 1
+    "gameId": 456,
+    "playerId": 1
   }
 }
 ```
@@ -725,20 +1031,8 @@ Fleet #1 assigned to group 1
   "messageType": "Command",
   "commandType": "MoveFleet",
   "payload": {
-    "fleetId": "fleet_789",
-    "targetPlanetId": "planet_012"
-  }
-}
-```
-
-**부대 지정**
-```json
-{
-  "messageType": "Command",
-  "commandType": "AssignControlGroup",
-  "payload": {
-    "fleetId": "fleet_789",
-    "groupNumber": 1
+    "fleetId": 789,
+    "targetPlanetId": 12
   }
 }
 ```
@@ -751,7 +1045,7 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "Connected",
   "payload": {
-    "playerId": "player_123",
+    "playerId": 1,
     "serverTime": 1234567890
   }
 }
@@ -763,11 +1057,11 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "GameStarted",
   "payload": {
-    "gameId": "game_456",
-    "mapId": "map_3lanes",
+    "gameId": 456,
+    "mapId": 1,
     "players": [
-      {"id": "player_123", "name": "Player1"},
-      {"id": "ai_001", "name": "AI"}
+      {"id": 1, "name": "Player1"},
+      {"id": 2, "name": "AI"}
     ]
   }
 }
@@ -779,7 +1073,7 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "ResourcesUpdated",
   "payload": {
-    "playerId": "player_123",
+    "playerId": 1,
     "minerals": 450,
     "gas": 120,
     "currentSupply": 12,
@@ -795,10 +1089,10 @@ Fleet #1 assigned to group 1
   "eventType": "FleetSpawned",
   "payload": {
     "fleet": {
-      "id": "fleet_789",
+      "id": 789,
       "type": "Fighter",
-      "ownerId": "player_123",
-      "locationPlanetId": "planet_001"
+      "ownerId": 1,
+      "locationPlanetId": 1
     }
   }
 }
@@ -810,9 +1104,9 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "FleetMoving",
   "payload": {
-    "fleetId": "fleet_789",
-    "fromPlanetId": "planet_001",
-    "toPlanetId": "planet_005",
+    "fleetId": 789,
+    "fromPlanetId": 1,
+    "toPlanetId": 5,
     "estimatedArrival": 345.8
   }
 }
@@ -824,10 +1118,10 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "CombatStarted",
   "payload": {
-    "combatId": "combat_111",
-    "attackerFleetId": "fleet_789",
-    "defenderFleetId": "fleet_555",
-    "locationPlanetId": "planet_005"
+    "combatId": 111,
+    "attackerFleetId": 789,
+    "defenderFleetId": 555,
+    "locationPlanetId": 5
   }
 }
 ```
@@ -838,7 +1132,7 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "CombatTick",
   "payload": {
-    "combatId": "combat_111",
+    "combatId": 111,
     "attackerHealth": 80,
     "defenderHealth": 60
   }
@@ -851,9 +1145,9 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "CombatEnded",
   "payload": {
-    "combatId": "combat_111",
-    "winnerId": "fleet_789",
-    "loserId": "fleet_555"
+    "combatId": 111,
+    "winnerFleetId": 789,
+    "loserFleetId": 555
   }
 }
 ```
@@ -864,8 +1158,8 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "PlanetCaptured",
   "payload": {
-    "planetId": "planet_005",
-    "newOwnerId": "player_123",
+    "planetId": 5,
+    "newOwnerId": 1,
     "previousOwnerId": null
   }
 }
@@ -877,7 +1171,7 @@ Fleet #1 assigned to group 1
   "messageType": "Event",
   "eventType": "GameEnded",
   "payload": {
-    "winnerId": "player_123",
+    "winnerId": 1,
     "reason": "HomeworldCaptured",
     "gameDuration": 1234.5
   }
@@ -913,7 +1207,7 @@ Fleet #1 assigned to group 1
     "changes": [
       {
         "type": "FleetMoved",
-        "fleetId": "fleet_789",
+        "fleetId": 789,
         "progress": 0.52
       }
     ]
@@ -933,26 +1227,61 @@ Fleet #1 assigned to group 1
 - **서버 조정**: 차이 발생 시 부드럽게 보정
 - **보간**: 이동 중인 오브젝트 위치 보간
 
-#### 6.3.3 동기화 전략
-- **Tick-based Sync**: N 틱마다 전체 상태 동기화 (예: 100틱)
-- **Event-driven**: 중요한 이벤트만 즉시 전송
-- **Snapshot Interpolation**: 두 스냅샷 사이 보간
+#### 6.3.3 동기화 전략: 락스텝 (Lockstep)
+
+**락스텝 동기화 방식**
+- 모든 클라이언트가 동일한 틱에서 동일한 명령을 실행
+- 서버는 각 틱마다 모든 클라이언트의 명령을 수집하고 브로드캐스트
+- 결정론적 시뮬레이션 보장 (동일 입력 → 동일 결과)
+
+**동작 흐름**
+```mermaid
+sequenceDiagram
+    participant C1 as Client 1
+    participant Server
+    participant C2 as Client 2
+
+    Note over Server: Tick N 시작
+    C1->>Server: Command (Tick N)
+    C2->>Server: Command (Tick N)
+
+    Note over Server: 모든 명령 수집 대기
+
+    Server->>C1: CommandBatch (Tick N)
+    Server->>C2: CommandBatch (Tick N)
+
+    Note over C1,C2: 각자 로컬에서<br/>동일한 명령 실행
+
+    Note over C1,C2: Tick N+1로 진행
+```
+
+**장점**
+- 완벽한 동기화 보장
+- 대역폭 효율적 (명령만 전송, 상태 전송 불필요)
+- 리플레이 시스템 구현 용이
+- 치트 방지에 유리
+
+**단점 및 해결책**
+- 지연 시간에 민감 → 입력 버퍼링 (2~3 틱 지연 허용)
+- 한 클라이언트 지연 시 전체 대기 → 타임아웃 설정 (200ms)
+- 재연결 처리 복잡 → 전체 상태 스냅샷 전송
 
 ---
 
 ## 7. 구현 로드맵
 
-### 7.1 Phase 1: CLI 단일 게임 로직 (4주)
+### 7.1 Phase 1: 서버 게임 로직 + WPF 테스트 클라이언트 (5주)
 
 #### Week 1: 기반 구조
-- [ ] 프로젝트 구조 설정
+- [ ] 프로젝트 구조 설정 (Server, CommonLib, WPF Client)
 - [ ] 데이터 모델 구현 (Planet, Fleet, Player, GameState)
 - [ ] GameConfig 구현
-- [ ] 기본 GameLoop 구현
+- [ ] 기본 GameLoop 구현 (Tick 기반)
 
 **산출물**
 - 빈 게임 상태 생성
 - 틱 기반 업데이트 작동
+- CommonLib 공유 라이브러리
 
 #### Week 2: 핵심 시스템 구현
 - [ ] Resource Manager 구현
@@ -975,19 +1304,40 @@ Fleet #1 assigned to group 1
 - AI와 대전 가능
 - 승패 판정 작동
 
-#### Week 4: CLI 인터페이스 & 테스트
-- [ ] CLI 화면 구현
-- [ ] 명령어 파서 구현
-- [ ] 저장/불러오기 구현
-- [ ] 통합 테스트
+#### Week 4: WPF 테스트 클라이언트 기본 구조
+- [ ] WPF 프로젝트 생성 (**MVP 패턴** - ChatClientWPF 기반)
+- [ ] GameClientModel 구현 (TCP 통신, Protocol 사용)
+- [ ] ITestView 인터페이스 정의
+- [ ] MainPresenter 구현
+- [ ] 메인 화면 및 테스트 모듈 선택기
+- [ ] 연결 테스트 모듈 (Model-View-Presenter)
+- [ ] 로그 시스템 구현
 
 **산출물**
-- 완전히 작동하는 CLI 게임
+- MVP 패턴 기반 WPF 클라이언트
+- 서버 연결 가능
+- ChatClientWPF와 동일한 아키텍처
+
+#### Week 5: WPF 테스트 모듈 구현
+- [ ] 각 모듈별 MVP 트리오 구현
+  - [ ] 자원 시스템 (IResourceTestView, ResourceTestPresenter)
+  - [ ] 함대 생산 (IFleetTestView, FleetTestPresenter)
+  - [ ] 함대 이동 (IMovementTestView, MovementTestPresenter, 맵 Canvas)
+  - [ ] 전투 시스템 (ICombatTestView, CombatTestPresenter)
+  - [ ] 점령 시스템 (IConquestTestView, ConquestTestPresenter)
+  - [ ] 통합 게임 (IFullGameView, FullGamePresenter)
+- [ ] 저장/불러오기 기능
+- [ ] 테스트 자동화 스크립트 실행기
+
+**산출물**
+- 모든 기능 독립 테스트 가능
+- MVP 패턴 일관성 유지
+- 시각적 피드백이 있는 테스트 환경
 - 테스트 결과 문서
 
-### 7.2 Phase 2: 네트워크 레이어 (3주)
+### 7.2 Phase 2: 락스텝 동기화 및 멀티플레이어 (4주)
 
-#### Week 5: 네트워크 기반
+#### Week 6: 네트워크 기반
 - [ ] WebSocket 서버 구현
 - [ ] 세션 관리자 구현
 - [ ] Command/Event 직렬화
@@ -996,43 +1346,60 @@ Fleet #1 assigned to group 1
 **산출물**
 - 클라이언트 연결 및 메시지 송수신
 
-#### Week 6: 멀티플레이어 로직
-- [ ] 게임 로비 시스템
+#### Week 7: 락스텝 동기화 구현
+- [ ] 틱 동기화 시스템
+- [ ] 명령 버퍼링 (입력 지연 처리)
+- [ ] CommandBatch 브로드캐스트
+- [ ] 결정론적 실행 보장
+
+**산출물**
+- 락스텝 동기화 작동
+- 완벽한 상태 일치 보장
+
+#### Week 8: 멀티플레이어 로직
+- [ ] 게임 로비 시스템 (룸 기반)
+- [ ] 2인 매칭 시스템
 - [ ] 명령 검증 및 실행
-- [ ] 상태 동기화 구현
-- [ ] 재연결 처리
+- [ ] 재연결 처리 (스냅샷 전송)
 
 **산출물**
 - 로컬 네트워크 멀티플레이 가능
+- WPF 클라이언트 2개로 대전 테스트
 
-#### Week 7: 최적화 & 테스트
-- [ ] 네트워크 최적화
-- [ ] 지연 보상 구현
-- [ ] 부하 테스트
+#### Week 9: 최적화 & 테스트
+- [ ] 네트워크 최적화 (명령 압축)
+- [ ] 타임아웃 처리 (느린 클라이언트)
+- [ ] 부하 테스트 (10+ 동시 게임)
 - [ ] 버그 수정
+- [ ] 리플레이 시스템 구현
 
 **산출물**
 - 안정적인 멀티플레이어 서버
+- 락스텝 성능 검증 완료
 
 ### 7.3 Phase 3: Unity 클라이언트 연동 (4주)
 
-#### Week 8-9: 기본 클라이언트
+#### Week 10-11: 기본 클라이언트
 - [ ] Unity 프로젝트 설정
-- [ ] 네트워크 클라이언트 구현
+- [ ] 네트워크 클라이언트 구현 (락스텝 지원)
 - [ ] 맵 렌더링
 - [ ] 행성 및 함대 표시
+- [ ] 로컬 시뮬레이션 (결정론적)
 
 **산출물**
 - 게임 상태 시각화
+- 락스텝 동기화 작동
 
-#### Week 10-11: UI & 상호작용
-- [ ] 플레이어 입력 처리
+#### Week 12-13: UI & 상호작용
+- [ ] 플레이어 입력 처리 (명령 버퍼링)
 - [ ] 함대 선택/이동 UI
 - [ ] 생산 UI
 - [ ] HUD (자원, 미니맵 등)
+- [ ] 시각 효과 및 애니메이션
 
 **산출물**
 - 완전한 게임 플레이 가능
+- Unity + WPF 동시 테스트 가능
 
 ### 7.4 Phase 4: 멀티플레이어 확장 (진행 중)
 
@@ -1112,7 +1479,6 @@ Fleet #1 assigned to group 1
 | **Garrison** | 행성에 주둔 중인 상태 |
 | **Conquest** | 행성 점령 과정 |
 | **Homeworld** | 모성 (시작 행성) |
-| **Control Group** | 부대 번호 지정 (1~5) |
 | **Deterministic** | 결정론적 (같은 입력 = 같은 결과) |
 | **Authoritative** | 권위 있는 (서버가 진실의 원천) |
 
@@ -1152,84 +1518,77 @@ Fleet #1 assigned to group 1
 
 ---
 
-## 부록 B: 샘플 CLI 세션
+## 부록 B: WPF 테스트 클라이언트 사용 예시
 
+### B.1 함대 생산 테스트 시나리오
+
+**실행 순서**
+1. WPF 클라이언트 실행
+2. 메인 화면에서 "Fleet Production Test" 선택
+3. 서버 주소 입력 (localhost:7777) 후 Connect 클릭
+4. 초기 자원 설정: Minerals 1000, Gas 500
+5. Fleet Type 드롭다운에서 "Scout" 선택
+6. "Produce" 버튼 클릭
+
+**예상 결과**
+- 생산 큐에 Scout 추가됨
+- 자원 차감: Minerals 950 (-50)
+- Progress Bar 표시: 0% → 100% (5초)
+- 생산 완료 후 함대 목록에 Scout #1 추가
+
+**로그 출력**
 ```
-$ dotnet run
-
-================== INTERPLANETARY CLI ==================
-Welcome to Interplanetary!
-
-Main Menu:
-  1. New Game (vs AI)
-  2. Load Game
-  3. Exit
-
-> 1
-
-Select difficulty:
-  1. Easy
-  2. Normal
-  3. Hard
-
-> 2
-
-Loading map: 3-Lane...
-Game started!
-
-================== INTERPLANETARY CLI ==================
-Game Time: 00:00:00          Tick: 0
-
-Your homeworld: Alpha
-Enemy homeworld: Delta
-
-> P
-Select fleet type:
-  1. Scout (50M, 0G, 1S) - 5s
-> 1
-
-Producing Scout... (5s)
-
-> [waiting 5 seconds]
-
-Scout spawned at Alpha!
-
-> M
-Select fleet:
-> 1
-
-Adjacent planets:
-  1. Beta (Neutral)
-> 1
-
-Scout moving Alpha → Beta...
-
-> [waiting 3 seconds]
-
-Scout arrived at Beta!
-Conquering Beta... (10s to capture)
-
-> [waiting 10 seconds]
-
-Beta captured!
-Minerals: 50 → 53/s (+3 from Beta)
-
-> Q
-Saving game...
-Game saved to: save_20250113_143022.json
-Goodbye!
+[INFO] Connected to server at localhost:7777
+[INFO] Initial resources set: M=1000, G=500
+[DEBUG] Sending ProduceFleet command: Scout
+[INFO] Fleet production started: Scout (ETA: 5s)
+[DEBUG] Resource update: M=950, G=500
+[INFO] Fleet spawned: Scout #1 at Alpha
+[DEBUG] Current fleet count: 1
 ```
 
+### B.2 전투 시스템 테스트 시나리오
+
+**실행 순서**
+1. "Combat Test" 모듈 선택
+2. Attacker Fleet 설정: Fighter (HP: 100, ATK: 20)
+3. Defender Fleet 설정: Scout (HP: 50, ATK: 10)
+4. "Start Combat" 버튼 클릭
+
+**예상 결과**
+- Tick 1: Fighter HP 90, Scout HP 30
+- Tick 2: Fighter HP 80, Scout HP 10
+- Tick 3: Fighter HP 70, Scout HP 0 (파괴)
+- 전투 종료: Fighter 승리
+
+**애니메이션**
+- 체력 바가 실시간으로 감소
+- 공격 이펙트 표시
+- 파괴된 함대는 Fade-out
+
+### B.3 통합 게임 테스트 시나리오
+
+**실행 순서**
+1. "Full Game Test" 모듈 선택
+2. 맵 선택: 3-Lane Map
+3. AI 난이도: Normal
+4. "Start Game" 버튼 클릭
+
+**게임 진행**
+- 00:00:05 - Scout 생산 명령
+- 00:00:10 - Scout 생성, Alpha 주둔
+- 00:00:12 - Scout을 Beta로 이동 명령
+- 00:00:18 - Scout이 Beta 도착, 점령 시작
+- 00:00:28 - Beta 점령 완료 (자원 증가)
+- 00:01:00 - Fighter 생산
+- ...
+- 00:05:30 - AI 모성 점령 완료
+- 게임 종료: 플레이어 승리
+
+**UI 업데이트**
+- 맵 뷰에서 함대 이동 애니메이션
+- 자원 HUD 실시간 업데이트
+- 이벤트 로그에 모든 액션 기록
+- 점령도 프로그레스 바 표시
+
 ---
-
-## 문서 버전 이력
-
-| 버전 | 날짜 | 변경 내용 |
-|------|------|-----------|
-| 1.0 | 2025-01-13 | 초안 작성 |
-
----
-
-**문서 작성자**: System Architect  
-**최종 수정일**: 2025-01-13  
-**문서 상태**: Draft

@@ -16,11 +16,28 @@
 **InterPlanetery Server**는 .NET 8.0 기반의 실시간 멀티플레이어 게임 서버입니다.
 
 ### 주요 기능
-- ✅ 2인 자동 매칭 시스템
-- ✅ 실시간 채팅 (Protocol 기반)
-- ✅ 룸 기반 세션 관리
-- ✅ 하트비트 & 타임아웃 체크
-- ✅ 빈 룸 자동 회수 (5초마다)
+
+#### 기본 기능
+- ✅ **룸 생성/입장 시스템** (2인 고정)
+  - 사용자가 직접 룸 생성 가능
+  - 룸 ID로 특정 룸 입장 가능
+  - 대기 중인 룸 목록 조회 가능
+- ✅ **룸 기반 세션 관리**
+  - 2인 대전 전용 (1vs1)
+  - 입장/퇴장 알림
+  - 빈 룸 자동 회수 (5초마다)
+- ✅ **실시간 채팅** (Protocol 기반)
+- ✅ **연결 관리**
+  - 하트비트 & 타임아웃 체크
+  - 자동 재연결 지원
+
+#### 선택적 기능 (구현 가능)
+- 🔄 **자동 매칭 시스템**
+  - 실력(ELO/MMR) 기반 매칭
+  - 빈자리 있는 룸 자동 검색
+  - 대기 시간 최소화
+
+#### 인프라
 - ✅ 공통 라이브러리 (CommonLib) 분리
 - ✅ 스레드 세이프 구현
 
@@ -195,7 +212,7 @@ private const int TIMEOUT_SECONDS = 30;                 // 타임아웃 시간 (
 **주요 속성**:
 ```csharp
 public string RoomId { get; private set; }              // 룸 ID ("ROOM_0001")
-public int MaxPlayers { get; private set; } = 2;        // 최대 인원
+public const int MaxPlayers = 2;                        // 최대 인원 (고정)
 private List<ClientSession> players;                    // 플레이어 리스트
 private readonly object lockObj;                        // 스레드 동기화
 ```
@@ -651,30 +668,25 @@ public class PlayerSession : ClientSession
 
 ---
 
-### 2. 다양한 룸 타입
+### 2. 룸 타입 확장 (미래 계획)
+
+현재는 2인 고정이지만, 향후 다음과 같은 확장이 가능합니다:
 
 ```csharp
-// RoomType 열거형 추가
+// RoomType 열거형 추가 (향후)
 public enum RoomType
 {
-    Chat2P,      // 2인 채팅 (현재)
-    Chat4P,      // 4인 채팅
-    Game2P,      // 2인 게임
-    Game4P,      // 4인 게임
-    Spectator    // 관전 모드
+    PvP1v1,      // 1vs1 대전 (현재)
+    PvP2v2,      // 2vs2 팀전 (미래)
+    FFA,         // Free For All (미래)
+    Coop,        // 협동 모드 (미래)
+    Spectator    // 관전 모드 (미래)
 }
 
-// RoomManager에 타입별 생성 메서드
-public GameRoom CreateRoom(RoomType type)
+// 현재 구현
+public GameRoom CreateRoom()
 {
-    switch (type)
-    {
-        case RoomType.Chat2P:
-            return new ChatRoom(2);
-        case RoomType.Game4P:
-            return new GameRoom(4);
-        // ...
-    }
+    return new GameRoom(); // 2인 고정
 }
 ```
 

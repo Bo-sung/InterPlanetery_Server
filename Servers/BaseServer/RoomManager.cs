@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TestServer
+namespace BaseServer
 {
     /// <summary>
     /// 게임 룸 관리 매니저 (싱글톤)

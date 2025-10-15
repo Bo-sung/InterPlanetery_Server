@@ -4,14 +4,14 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using CommonLib;
 
-namespace TestServer
+namespace BaseServer
 {
 	class Program
 	{
 		static async Task Main(string[] _args)
 		{
 			Console.WriteLine("========================================");
-			Console.WriteLine("    Chat Server Starting...");
+			Console.WriteLine("    Base Server Starting...");
 			Console.WriteLine("========================================");
 			Console.WriteLine();
 
