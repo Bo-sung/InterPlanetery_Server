@@ -294,13 +294,107 @@ sequenceDiagram
 
 **참고 문서**: [#DB DDL 모음.sql](../#DB%20DDL%20모음.sql)
 
-**사용하는 테이블**:
+**현재 사용 중인 테이블**:
 - `maps` - 맵 정보 (player1_homeworld_id, player2_homeworld_id 포함)
 - `planet_info` - 행성 정보 (name, mineral, gas, supply)
 - `map_planets` - 맵별 행성 배치 (position_x, position_y)
 - `planet_routes` - 행성 간 연결 정보
 
-#### 3.2.2 게임 시작 시 맵 로드 절차
+#### 3.2.2 DB 테이블화 예정 항목
+
+다음 요소들은 현재 메모리/하드코딩으로 관리되지만, Phase 4 이전에 DB 테이블로 마이그레이션 예정입니다.
+
+**1. 사용자 계정 관리 (`users`)**
+- 필요 이유: 룸 기반 멀티플레이어를 위한 사용자 식별
+- 예정 컬럼:
+  - user_id (PK, AUTO_INCREMENT)
+  - username (UNIQUE, 로그인 ID)
+  - password_hash
+  - display_name (게임 내 표시 이름)
+  - created_at
+  - last_login_at
+
+**2. 게임 전적 기록 (`game_records`)**
+- 필요 이유: Phase 4 랭킹/리더보드 기능, 통계 분석
+- 예정 컬럼:
+  - game_id (PK, AUTO_INCREMENT)
+  - room_id (VARCHAR)
+  - map_id (FK → maps)
+  - player1_id (FK → users)
+  - player2_id (FK → users)
+  - winner_id (FK → users, NULL 가능)
+  - game_duration (INT, 초 단위)
+  - started_at (DATETIME)
+  - ended_at (DATETIME)
+  - replay_data (LONGTEXT, JSON - 리플레이 시스템용)
+
+**3. 게임 통계 (`player_statistics`)**
+- 필요 이유: 플레이어별 상세 전적 기록 및 분석
+- 예정 컬럼:
+  - stat_id (PK, AUTO_INCREMENT)
+  - game_id (FK → game_records)
+  - player_id (FK → users)
+  - fleets_produced (INT, 생산한 함대 수)
+  - planets_captured (INT, 점령한 행성 수)
+  - combats_won (INT, 승리한 전투 수)
+  - total_damage_dealt (INT, 누적 데미지)
+  - final_resource_count (JSON, 게임 종료 시 자원)
+
+**4. 플레이어 랭킹 (`player_rankings`)**
+- 필요 이유: 경쟁 요소 제공, 리더보드 기능
+- 예정 컬럼:
+  - player_id (PK, FK → users)
+  - total_games (INT, 총 게임 수)
+  - wins (INT, 승리 수)
+  - losses (INT, 패배 수)
+  - win_rate (DECIMAL, 승률 %)
+  - elo_rating (INT, ELO 점수)
+  - current_rank (INT, 현재 순위)
+  - updated_at (DATETIME)
+
+**5. 함대 타입 설정 (`fleet_types`)**
+- 필요 이유: 밸런스 패치 시 서버 재시작 없이 조정 가능
+- 예정 컬럼:
+  - fleet_type_id (PK, AUTO_INCREMENT)
+  - type_name (VARCHAR, Scout/Fighter/Cruiser/Battleship)
+  - max_health (INT)
+  - attack_power (INT)
+  - move_speed (FLOAT)
+  - mineral_cost (INT)
+  - gas_cost (INT)
+  - supply_cost (INT)
+  - production_time (INT, 초 단위)
+  - version (VARCHAR, 밸런스 패치 버전)
+
+**6. 게임 설정 (`game_config`)**
+- 필요 이유: 서버 재시작 없이 게임 밸런스 조정
+- 예정 컬럼:
+  - config_key (PK, VARCHAR) - 예: "tick_rate", "resource_tick_rate"
+  - config_value (TEXT, JSON)
+  - description (VARCHAR)
+  - updated_at (DATETIME)
+
+**7. AI 난이도 설정 (`ai_difficulty_levels`)**
+- 필요 이유: 유연한 난이도 밸런싱
+- 예정 컬럼:
+  - difficulty_id (PK, AUTO_INCREMENT)
+  - difficulty_name (VARCHAR, Easy/Normal/Hard)
+  - production_interval (FLOAT, 초)
+  - command_interval (FLOAT, 초)
+  - resource_bonus_percent (INT, %)
+
+**8. 리플레이 메타데이터 (`replays`)**
+- 필요 이유: 리플레이 파일 관리 및 검색 (Phase 2 Week 9)
+- 예정 컬럼:
+  - replay_id (PK, AUTO_INCREMENT)
+  - game_id (FK → game_records)
+  - file_path (VARCHAR, 리플레이 파일 저장 경로)
+  - file_size (BIGINT, 바이트)
+  - duration (INT, 초)
+  - view_count (INT, 조회수)
+  - created_at (DATETIME)
+
+#### 3.2.3 게임 시작 시 맵 로드 절차
 
 1. `maps` 테이블에서 선택한 맵 정보 로드
 2. `map_planets`에서 해당 맵의 행성 배치 로드
