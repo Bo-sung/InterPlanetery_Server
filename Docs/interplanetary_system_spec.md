@@ -30,7 +30,7 @@
 ### 1.3 기술 스택
 - **언어**: C# (.NET 8.0)
 - **서버**: TCP 소켓 기반 게임 서버
-- **통신 프로토콜**: TCP / WebSocket
+- **통신 프로토콜**: TCP
 - **직렬화**: 커스텀 바이너리 프로토콜 + JSON (CommonLib.Protocol)
 - **동기화 방식**: 락스텝(Lockstep)
 - **테스트 클라이언트**: WPF (MVP 패턴)
@@ -70,7 +70,7 @@ graph TB
     end
 
     subgraph Network["네트워크 레이어"]
-        NetLayer["WebSocket/TCP 서버<br/>- 세션 관리<br/>- 직렬화/역직렬화"]
+        NetLayer["TCP 서버<br/>- 세션 관리<br/>- 직렬화/역직렬화"]
     end
 
     subgraph Clients["Unity 클라이언트들"]
@@ -763,18 +763,18 @@ public class GameClientModel
     public event Action<PlanetCaptured>? OnPlanetCaptured;
     public event Action<string>? OnErrorOccurred;
 
-    // 연결 관리
+    // 연결 관리 (TCP)
     public async Task<bool> ConnectAsync(string host, int port);
     public void Disconnect();
 
-    // 게임 명령 전송
+    // 게임 명령 전송 (CommonLib.Protocol 사용)
     public async Task ProduceFleetAsync(FleetType type);
     public async Task MoveFleetAsync(int fleetId, int targetPlanetId);
 
     // 락스텝 동기화
     public void RegisterCommandForTick(int tickNumber, Protocol command);
 
-    // 프로토콜 수신 루프
+    // 프로토콜 수신 루프 (TCP 비동기 I/O)
     private async Task ReceiveLoopAsync();
     private void HandleProtocol(Protocol protocol);
 }
@@ -966,261 +966,217 @@ public class ResourceTestPresenter
 
 #### 6.1.1 프로토콜 선택
 
-**Phase 2: WebSocket**
-- 양방향 실시간 통신
-- JSON 메시지 형식
-- 웹 브라우저 호환
+**TCP 기반 통신**
+- BaseServer 프로젝트의 기존 TCP 인프라 활용
+- CommonLib.Protocol 클래스 사용 (바이너리 + JSON)
+- 낮은 지연시간 및 안정적인 연결
+- 모바일/Unity 클라이언트 호환
 
-**Phase 4: TCP (선택)**
-- 더 낮은 지연시간
-- 바이너리 프로토콜
-- 모바일 최적화
+**프로토콜 구조 (CommonLib.Protocol 참조)**
+- **헤더**: `[Length(4)][Type(4)][Timestamp(8)][DataCount(2)]`
+- **데이터**: Key-Value 형식의 바이너리 직렬화
+- **직렬화**: 기본 타입은 바이너리, 복합 객체는 JSON
 
-#### 6.1.2 메시지 구조
-```json
-{
-  "messageType": "Command|Event|Sync",
-  "timestamp": 1234567890,
-  "payload": { ... }
-}
+#### 6.1.2 메시지 전송 방식
+
+**CommonLib.Protocol 사용**
+- Protocol 객체 생성 → 데이터 추가 → 바이너리로 직렬화 → TCP 전송
+- 수신: TCP 스트림 → 바이너리 역직렬화 → Protocol 객체 복원
+
+**예시 코드 (함대 생산 명령)**
+```csharp
+// 송신 (클라이언트 → 서버)
+Protocol protocol = new Protocol(ProtocolType.PRODUCE_FLEET);
+protocol.AddData("fleetType", (int)FleetType.Fighter);
+await SendProtocolAsync(protocol);
+
+// 수신 및 처리 (서버)
+Protocol receivedProtocol = await ReceiveProtocolAsync();
+int fleetType = receivedProtocol.GetData<int>("fleetType");
 ```
 
-### 6.2 메시지 타입 정의
+### 6.2 프로토콜 타입 정의
+
+게임 서버용 프로토콜 타입은 BaseServer의 채팅 프로토콜(1000~2999번)과 구분하기 위해 **3000번대(클라이언트→서버), 4000번대(서버→클라이언트)**를 사용합니다.
 
 #### 6.2.1 클라이언트 → 서버 (Commands)
 
-**연결/인증**
-```json
-{
-  "messageType": "Command",
-  "commandType": "Connect",
-  "payload": {
-    "playerId": 1,
-    "playerName": "Player1",
-    "authToken": "jwt_token_here"
-  }
-}
-```
+**3001 - CONNECT (서버 연결)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - playerId : int
+  - playerName : String
+  - authToken : String
 
-**게임 참가**
-```json
-{
-  "messageType": "Command",
-  "commandType": "JoinGame",
-  "payload": {
-    "gameId": 456,
-    "playerId": 1
-  }
-}
-```
+**3002 - JOIN_GAME (게임 참가)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - gameId : int
+  - playerId : int
 
-**함대 생산**
-```json
-{
-  "messageType": "Command",
-  "commandType": "ProduceFleet",
-  "payload": {
-    "fleetType": "Fighter"
-  }
-}
-```
+**3003 - PRODUCE_FLEET (함대 생산 요청)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - fleetType : int
 
-**함대 이동**
-```json
-{
-  "messageType": "Command",
-  "commandType": "MoveFleet",
-  "payload": {
-    "fleetId": 789,
-    "targetPlanetId": 12
-  }
-}
-```
+**3004 - MOVE_FLEET (함대 이동 명령)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - fleetId : int
+  - targetPlanetId : int
+
+**3005 - HEARTBEAT (하트비트)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - timestamp : long
 
 #### 6.2.2 서버 → 클라이언트 (Events)
 
-**연결 성공**
-```json
-{
-  "messageType": "Event",
-  "eventType": "Connected",
-  "payload": {
-    "playerId": 1,
-    "serverTime": 1234567890
-  }
-}
-```
+**4001 - CONNECTED (연결 성공)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - playerId : int
+  - serverTime : long
+  - message : String
 
-**게임 시작**
-```json
-{
-  "messageType": "Event",
-  "eventType": "GameStarted",
-  "payload": {
-    "gameId": 456,
-    "mapId": 1,
-    "players": [
-      {"id": 1, "name": "Player1"},
-      {"id": 2, "name": "AI"}
-    ]
-  }
-}
-```
+**4002 - GAME_STARTED (게임 시작)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - gameId : int
+  - mapId : int
+  - players : String (JSON)
 
-**자원 업데이트**
-```json
-{
-  "messageType": "Event",
-  "eventType": "ResourcesUpdated",
-  "payload": {
-    "playerId": 1,
-    "minerals": 450,
-    "gas": 120,
-    "currentSupply": 12,
-    "maxSupply": 25
-  }
-}
-```
+**4003 - RESOURCES_UPDATED (자원 업데이트)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - playerId : int
+  - minerals : float
+  - gas : float
+  - currentSupply : int
+  - maxSupply : int
 
-**함대 생성**
-```json
-{
-  "messageType": "Event",
-  "eventType": "FleetSpawned",
-  "payload": {
-    "fleet": {
-      "id": 789,
-      "type": "Fighter",
-      "ownerId": 1,
-      "locationPlanetId": 1
-    }
-  }
-}
-```
+**4004 - FLEET_SPAWNED (함대 생성 완료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - fleetId : int
+  - fleetType : int
+  - ownerId : int
+  - planetId : int
 
-**함대 이동 시작**
-```json
-{
-  "messageType": "Event",
-  "eventType": "FleetMoving",
-  "payload": {
-    "fleetId": 789,
-    "fromPlanetId": 1,
-    "toPlanetId": 5,
-    "estimatedArrival": 345.8
-  }
-}
-```
+**4005 - FLEET_MOVING (함대 이동 시작)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - fleetId : int
+  - fromPlanetId : int
+  - toPlanetId : int
+  - estimatedArrival : float
 
-**전투 시작**
-```json
-{
-  "messageType": "Event",
-  "eventType": "CombatStarted",
-  "payload": {
-    "combatId": 111,
-    "attackerFleetId": 789,
-    "defenderFleetId": 555,
-    "locationPlanetId": 5
-  }
-}
-```
+**4006 - FLEET_ARRIVED (함대 도착)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - fleetId : int
+  - planetId : int
 
-**전투 틱**
-```json
-{
-  "messageType": "Event",
-  "eventType": "CombatTick",
-  "payload": {
-    "combatId": 111,
-    "attackerHealth": 80,
-    "defenderHealth": 60
-  }
-}
-```
+**4007 - COMBAT_STARTED (전투 시작)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - combatId : int
+  - attackerFleetId : int
+  - defenderFleetId : int
+  - locationPlanetId : int
 
-**전투 종료**
-```json
-{
-  "messageType": "Event",
-  "eventType": "CombatEnded",
-  "payload": {
-    "combatId": 111,
-    "winnerFleetId": 789,
-    "loserFleetId": 555
-  }
-}
-```
+**4008 - COMBAT_TICK (전투 진행)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - combatId : int
+  - attackerHealth : int
+  - defenderHealth : int
 
-**행성 점령**
-```json
-{
-  "messageType": "Event",
-  "eventType": "PlanetCaptured",
-  "payload": {
-    "planetId": 5,
-    "newOwnerId": 1,
-    "previousOwnerId": null
-  }
-}
-```
+**4009 - COMBAT_ENDED (전투 종료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - combatId : int
+  - winnerFleetId : int
+  - loserFleetId : int
 
-**게임 종료**
-```json
-{
-  "messageType": "Event",
-  "eventType": "GameEnded",
-  "payload": {
-    "winnerId": 1,
-    "reason": "HomeworldCaptured",
-    "gameDuration": 1234.5
-  }
-}
-```
+**4010 - PLANET_CAPTURED (행성 점령 완료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - planetId : int
+  - newOwnerId : int
+  - previousOwnerId : int
+
+**4011 - PLANET_CONQUEST_PROGRESS (점령 진행도)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - planetId : int
+  - progress : float
+  - attackerId : int
+
+**4012 - GAME_ENDED (게임 종료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - winnerId : int
+  - reason : String
+  - gameDuration : float
+
+**4013 - HEARTBEAT_ACK (하트비트 응답)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - serverTime : long
+
+**4999 - ERROR (에러 메시지)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - errorCode : int
+  - message : String
 
 #### 6.2.3 상태 동기화 (Sync)
 
-**전체 상태 동기화**
-```json
-{
-  "messageType": "Sync",
-  "syncType": "FullState",
-  "payload": {
-    "gameState": {
-      "gameTime": 332.5,
-      "tickCount": 6650,
-      "players": [...],
-      "planets": [...],
-      "fleets": [...]
-    }
-  }
-}
+**4101 - FULL_STATE_SYNC (전체 상태 동기화)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - gameTime : float
+  - tickCount : long
+  - gameState : String
+
+**4102 - DELTA_UPDATE (증분 업데이트)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - tickCount : long
+  - changes : String
+
+**4103 - TICK_COMMANDS (틱별 명령 배치)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - tickNumber : long
+  - commands : String
+
+#### 6.2.4 사용 예시
+
+**클라이언트 → 서버 (함대 생산)**
+```csharp
+Protocol protocol = new Protocol(3003); // PRODUCE_FLEET
+protocol.AddData("fleetType", (int)FleetType.Fighter);
+await SendProtocolAsync(protocol);
 ```
 
-**증분 업데이트**
-```json
-{
-  "messageType": "Sync",
-  "syncType": "DeltaUpdate",
-  "payload": {
-    "tickCount": 6651,
-    "changes": [
-      {
-        "type": "FleetMoved",
-        "fleetId": 789,
-        "progress": 0.52
-      }
-    ]
-  }
-}
+**서버 → 클라이언트 (함대 생성 완료)**
+```csharp
+Protocol protocol = new Protocol(4004); // FLEET_SPAWNED
+protocol.AddData("fleetId", 789);
+protocol.AddData("fleetType", (int)FleetType.Fighter);
+protocol.AddData("ownerId", 1);
+protocol.AddData("planetId", 1);
+await BroadcastProtocolAsync(protocol);
 ```
 
 ### 6.3 네트워크 최적화
 
 #### 6.3.1 대역폭 최적화
-- **이벤트 배칭**: 여러 이벤트를 하나의 메시지로 묶음
-- **증분 업데이트**: 변경된 부분만 전송
-- **압축**: JSON → MessagePack 또는 Protobuf
+- **기본 타입 직접 전송**: int, float 등은 바이너리로 전송 (CommonLib.Protocol)
+- **복잡한 객체만 JSON**: 배열, 구조체는 JSON 직렬화 후 string으로 전송
+- **증분 업데이트**: 변경된 부분만 전송 (락스텝 방식에서는 명령만 전송)
 
 #### 6.3.2 지연 보상
 - **클라이언트 예측**: 입력 즉시 로컬 시뮬레이션
@@ -1338,9 +1294,9 @@ sequenceDiagram
 ### 7.2 Phase 2: 락스텝 동기화 및 멀티플레이어 (4주)
 
 #### Week 6: 네트워크 기반
-- [ ] WebSocket 서버 구현
-- [ ] 세션 관리자 구현
-- [ ] Command/Event 직렬화
+- [ ] BaseServer TCP 인프라 확장
+- [ ] 게임 전용 세션 관리자 구현
+- [ ] Command/Event 직렬화 (CommonLib.Protocol 활용)
 - [ ] 메시지 큐 구현
 
 **산출물**
@@ -1381,7 +1337,7 @@ sequenceDiagram
 
 #### Week 10-11: 기본 클라이언트
 - [ ] Unity 프로젝트 설정
-- [ ] 네트워크 클라이언트 구현 (락스텝 지원)
+- [ ] TCP 네트워크 클라이언트 구현 (CommonLib.Protocol 활용, 락스텝 지원)
 - [ ] 맵 렌더링
 - [ ] 행성 및 함대 표시
 - [ ] 로컬 시뮬레이션 (결정론적)
@@ -1461,10 +1417,11 @@ sequenceDiagram
 - **Galcon**: 단순화된 행성 정복 게임
 
 ### 9.3 기술 스택 문서
-- .NET 6.0 Documentation
-- WebSocket Protocol (RFC 6455)
+- .NET 8.0 Documentation
+- TCP/IP Socket Programming
 - JSON Serialization Best Practices
 - Game Server Architecture Patterns
+- CommonLib.Protocol 명세 (Guides/ProtocolSpecification.md)
 
 ---
 
