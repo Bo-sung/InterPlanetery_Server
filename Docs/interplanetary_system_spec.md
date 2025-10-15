@@ -45,7 +45,12 @@
 
 ```mermaid
 graph TB
-    subgraph GameServer["게임 서버"]
+    subgraph BaseServer["BaseServer (TCP 인프라)"]
+        SessionMgr["Session Manager<br/>- 클라이언트 연결 관리<br/>- 인증 처리"]
+        RoomMgr["Room Manager<br/>- 게임 룸 생성/삭제<br/>- 매칭 시스템<br/>- 룸 목록 관리"]
+    end
+
+    subgraph GameServer["게임 서버 (Game Room Instance)"]
         CoreEngine["Core Game Engine<br/>- GameState Manager<br/>- Game Loop (Tick 기반)"]
 
         subgraph Managers["게임 매니저들"]
@@ -69,42 +74,111 @@ graph TB
         CoreEngine --> EventSys
     end
 
-    subgraph Network["네트워크 레이어"]
-        NetLayer["TCP 서버<br/>- 세션 관리<br/>- 직렬화/역직렬화"]
+    subgraph Clients["클라이언트들"]
+        Client1["Client 1<br/>(WPF/Unity)"]
+        Client2["Client 2<br/>(WPF/Unity)"]
+        ClientN["Client N<br/>(WPF/Unity)"]
     end
 
-    subgraph Clients["Unity 클라이언트들"]
-        Client["Unity Client<br/>- Rendering & Animation<br/>- Input Handling<br/>- UI/UX"]
-    end
-
-    GameServer <--> Network
-    Network <--> Clients
+    Clients --> SessionMgr
+    SessionMgr --> RoomMgr
+    RoomMgr -.-> |"룸 생성"| GameServer
+    GameServer -.-> |"게임 종료"| RoomMgr
+    RoomMgr --> Clients
 ```
 
-### 2.2 설계 원칙
+### 2.2 Room Management 시스템
 
-#### 2.2.1 권위 있는 서버 (Authoritative Server)
+#### 2.2.1 개요
+- 여러 사용자가 동시에 접속하여 각자 게임 룸을 생성/참가
+- 각 게임 룸은 독립적인 2인 대전 RTS 게임 인스턴스
+- BaseServer의 기존 RoomManager 인프라 확장 활용
+
+#### 2.2.2 Room 생명주기
+
+```mermaid
+stateDiagram-v2
+    [*] --> Waiting: 룸 생성
+    Waiting --> Ready: 2명 참가
+    Ready --> Playing: 게임 시작
+    Playing --> Ended: 승패 결정
+    Ended --> [*]: 룸 삭제
+
+    Waiting --> [*]: 타임아웃/취소
+    Playing --> Ended: 플레이어 퇴장
+```
+
+#### 2.2.3 Room 구조
+
+**GameRoom 클래스**
+- RoomId: string (고유 식별자)
+- MapId: int (사용할 맵)
+- Players: List\<PlayerSession\> (최대 2명)
+- GameState: GameState (게임 상태 인스턴스)
+- Status: RoomStatus (Waiting/Ready/Playing/Ended)
+- CreatedAt: DateTime (생성 시간)
+
+**동시 처리**
+- 서버는 여러 GameRoom을 동시에 관리
+- 각 GameRoom은 독립적인 게임 루프 실행
+- 룸 간 간섭 없음 (완전 격리)
+
+#### 2.2.4 사용자 흐름
+
+```mermaid
+sequenceDiagram
+    participant C1 as Client 1
+    participant Server
+    participant Room
+    participant C2 as Client 2
+
+    C1->>Server: 연결 (CONNECT)
+    Server->>C1: 연결 성공
+    C1->>Server: 룸 생성 (CREATE_ROOM)
+    Server->>Room: GameRoom 생성
+    Server->>C1: 룸 생성 완료 (대기 중)
+
+    C2->>Server: 연결 (CONNECT)
+    Server->>C2: 연결 성공
+    C2->>Server: 룸 참가 (JOIN_ROOM)
+    Server->>Room: Player 2 추가
+    Room->>C1: 상대방 참가 알림
+    Room->>C2: 참가 성공
+
+    Room->>C1: 게임 시작 (GAME_STARTED)
+    Room->>C2: 게임 시작 (GAME_STARTED)
+
+    Note over Room: 게임 진행 (2인 대전)
+
+    Room->>C1: 게임 종료 (GAME_ENDED)
+    Room->>C2: 게임 종료 (GAME_ENDED)
+    Server->>Room: 룸 삭제
+```
+
+### 2.3 설계 원칙
+
+#### 2.3.1 권위 있는 서버 (Authoritative Server)
 - 모든 게임 상태는 서버가 관리하고 결정
 - 클라이언트는 입력만 전송하고 결과만 수신
 - 치트 방지 및 공정한 게임 진행 보장
 
-#### 2.2.2 결정론적 시뮬레이션 (Deterministic Simulation)
+#### 2.3.2 결정론적 시뮬레이션 (Deterministic Simulation)
 - 동일한 초기 상태 + 동일한 입력 = 동일한 결과
 - 리플레이 기능 구현 가능
 - 디버깅 용이
 - **락스텝(Lockstep) 동기화 사용**: 모든 클라이언트가 동일한 틱에서 동일한 명령 실행
 
-#### 2.2.3 명령 패턴 (Command Pattern)
+#### 2.3.3 명령 패턴 (Command Pattern)
 - 모든 플레이어 행동은 Command 객체로 캡슐화
 - 명령 큐를 통한 순차 처리
 - 명령 취소, 재실행 가능
 
-#### 2.2.4 이벤트 기반 (Event-Driven)
+#### 2.3.4 이벤트 기반 (Event-Driven)
 - 상태 변화는 Event로 브로드캐스트
 - 느슨한 결합(Loose Coupling)
 - 클라이언트 동기화 용이
 
-#### 2.2.5 틱 기반 업데이트 (Tick-Based Update)
+#### 2.3.5 틱 기반 업데이트 (Tick-Based Update)
 - 고정된 시간 간격으로 게임 상태 업데이트 (예: 50ms = 20 TPS)
 - 네트워크 지연에 강건한 구조
 - 예측 가능한 동작
@@ -999,20 +1073,42 @@ int fleetType = receivedProtocol.GetData<int>("fleetType");
 
 게임 서버용 프로토콜 타입은 BaseServer의 채팅 프로토콜(1000~2999번)과 구분하기 위해 **3000번대(클라이언트→서버), 4000번대(서버→클라이언트)**를 사용합니다.
 
-#### 6.2.1 클라이언트 → 서버 (Commands)
+#### 6.2.1 클라이언트 → 서버 (Session & Room Management)
 
 **3001 - CONNECT (서버 연결)**
 - 방향: 클라이언트 → 서버
 - 파라미터:
-  - playerId : int
   - playerName : String
-  - authToken : String
+  - version : String
 
-**3002 - JOIN_GAME (게임 참가)**
+**3100 - CREATE_ROOM (룸 생성)**
 - 방향: 클라이언트 → 서버
 - 파라미터:
-  - gameId : int
-  - playerId : int
+  - mapId : int
+  - roomName : String
+  - isPrivate : bool
+
+**3101 - JOIN_ROOM (룸 참가)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - roomId : String
+
+**3102 - LEAVE_ROOM (룸 퇴장)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - (파라미터 없음)
+
+**3103 - GET_ROOM_LIST (룸 목록 조회)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - (파라미터 없음)
+
+**3104 - READY (준비 완료)**
+- 방향: 클라이언트 → 서버
+- 파라미터:
+  - isReady : bool
+
+#### 6.2.2 클라이언트 → 서버 (Game Commands)
 
 **3003 - PRODUCE_FLEET (함대 생산 요청)**
 - 방향: 클라이언트 → 서버
@@ -1030,14 +1126,59 @@ int fleetType = receivedProtocol.GetData<int>("fleetType");
 - 파라미터:
   - timestamp : long
 
-#### 6.2.2 서버 → 클라이언트 (Events)
+#### 6.2.3 서버 → 클라이언트 (Session & Room Management)
 
 **4001 - CONNECTED (연결 성공)**
 - 방향: 서버 → 클라이언트
 - 파라미터:
-  - playerId : int
+  - sessionId : String
+  - playerName : String
   - serverTime : long
-  - message : String
+
+**4200 - ROOM_CREATED (룸 생성 완료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - roomId : String
+  - roomName : String
+  - mapId : int
+
+**4201 - ROOM_JOINED (룸 참가 완료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - roomId : String
+  - playerSlot : int
+  - roomInfo : String
+
+**4202 - ROOM_LEFT (룸 퇴장 완료)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - (파라미터 없음)
+
+**4203 - PLAYER_JOINED_ROOM (다른 플레이어 입장)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - playerName : String
+  - playerSlot : int
+
+**4204 - PLAYER_LEFT_ROOM (다른 플레이어 퇴장)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - playerSlot : int
+  - reason : String
+
+**4205 - ROOM_LIST (룸 목록)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - roomCount : int
+  - rooms : String
+
+**4206 - PLAYER_READY_STATE (플레이어 준비 상태)**
+- 방향: 서버 → 클라이언트
+- 파라미터:
+  - playerSlot : int
+  - isReady : bool
+
+#### 6.2.4 서버 → 클라이언트 (Game Events)
 
 **4002 - GAME_STARTED (게임 시작)**
 - 방향: 서버 → 클라이언트
@@ -1131,7 +1272,7 @@ int fleetType = receivedProtocol.GetData<int>("fleetType");
   - errorCode : int
   - message : String
 
-#### 6.2.3 상태 동기화 (Sync)
+#### 6.2.5 상태 동기화 (Sync)
 
 **4101 - FULL_STATE_SYNC (전체 상태 동기화)**
 - 방향: 서버 → 클라이언트
@@ -1152,7 +1293,38 @@ int fleetType = receivedProtocol.GetData<int>("fleetType");
   - tickNumber : long
   - commands : String
 
-#### 6.2.4 사용 예시
+#### 6.2.6 사용 예시
+
+**룸 생성 및 참가**
+```csharp
+// 클라이언트 1: 룸 생성
+Protocol createRoomProtocol = new Protocol(3100); // CREATE_ROOM
+createRoomProtocol.AddData("mapId", 1);
+createRoomProtocol.AddData("roomName", "My Game Room");
+createRoomProtocol.AddData("isPrivate", false);
+await SendProtocolAsync(createRoomProtocol);
+
+// 서버 → 클라이언트 1: 룸 생성 완료
+Protocol roomCreatedProtocol = new Protocol(4200); // ROOM_CREATED
+roomCreatedProtocol.AddData("roomId", "ROOM_abc123");
+roomCreatedProtocol.AddData("roomName", "My Game Room");
+roomCreatedProtocol.AddData("mapId", 1);
+await SendProtocolAsync(roomCreatedProtocol);
+
+// 클라이언트 2: 룸 참가
+Protocol joinRoomProtocol = new Protocol(3101); // JOIN_ROOM
+joinRoomProtocol.AddData("roomId", "ROOM_abc123");
+await SendProtocolAsync(joinRoomProtocol);
+
+// 서버 → 클라이언트 2: 참가 완료
+Protocol roomJoinedProtocol = new Protocol(4201); // ROOM_JOINED
+roomJoinedProtocol.AddData("roomId", "ROOM_abc123");
+roomJoinedProtocol.AddData("playerSlot", 2);
+roomJoinedProtocol.AddData("roomInfo", "{...}");
+await SendProtocolAsync(roomJoinedProtocol);
+```
+
+**게임 명령 (함대 생산)**
 
 **클라이언트 → 서버 (함대 생산)**
 ```csharp
@@ -1228,16 +1400,23 @@ sequenceDiagram
 
 ### 7.1 Phase 1: 서버 게임 로직 + WPF 테스트 클라이언트 (5주)
 
-#### Week 1: 기반 구조
+#### Week 1: 기반 구조 및 Room Management
 - [ ] 프로젝트 구조 설정 (Server, CommonLib, WPF Client)
+- [ ] BaseServer의 RoomManager 확장
+  - [ ] GameRoom 클래스 구현 (RoomId, MapId, Players, GameState, Status)
+  - [ ] 룸 생성/참가/퇴장 로직
+  - [ ] 룸 목록 관리
 - [ ] 데이터 모델 구현 (Planet, Fleet, Player, GameState)
 - [ ] GameConfig 구현
 - [ ] 기본 GameLoop 구현 (Tick 기반)
+- [ ] 룸 관련 프로토콜 핸들러 등록 (3100-3104, 4200-4206)
 
 **산출물**
 - 빈 게임 상태 생성
 - 틱 기반 업데이트 작동
 - CommonLib 공유 라이브러리
+- 룸 생성 및 2명 참가 가능
+- 각 룸은 독립적인 게임 인스턴스 보유
 
 #### Week 2: 핵심 시스템 구현
 - [ ] Resource Manager 구현
@@ -1267,11 +1446,18 @@ sequenceDiagram
 - [ ] MainPresenter 구현
 - [ ] 메인 화면 및 테스트 모듈 선택기
 - [ ] 연결 테스트 모듈 (Model-View-Presenter)
+- [ ] **룸 관리 UI 구현**
+  - [ ] 룸 목록 조회 화면
+  - [ ] 룸 생성 다이얼로그 (맵 선택, 룸 이름)
+  - [ ] 룸 참가/퇴장 버튼
+  - [ ] 대기실 화면 (플레이어 목록, Ready 버튼)
 - [ ] 로그 시스템 구현
 
 **산출물**
 - MVP 패턴 기반 WPF 클라이언트
 - 서버 연결 가능
+- 룸 생성 및 참가 UI 작동
+- 2명이 룸에서 대기 가능
 - ChatClientWPF와 동일한 아키텍처
 
 #### Week 5: WPF 테스트 모듈 구현
