@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<mapper namespace="FleetMapper">
+  <select id="getFleetTypes">
+    SELECT 
+        fleet_type_id AS Id,
+        type_name AS Name,
+        max_health AS MaxHealth,
+        attack_power AS AttackPower,
+        move_speed AS MoveSpeed,
+        mineral_cost AS MineralCost,
+        gas_cost AS GasCost,
+        supply_cost AS SupplyCost,
+        production_time AS ProductionTime
+    FROM fleet_types;
+  </select>
+</mapper>
