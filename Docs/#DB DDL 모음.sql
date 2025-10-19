@@ -52,3 +52,25 @@ CREATE TABLE `planet_routes` (
   CONSTRAINT `planet_routes_ibfk_3` FOREIGN KEY (`planet_to_id`) REFERENCES `planet_info` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `planet_routes_chk_1` CHECK ((`planet_from_id` < `planet_to_id`))
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+
+-- 함대 기본 스탯 정보
+CREATE TABLE `fleet_info` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `type_name` varchar(255) NOT NULL,
+  `max_health` int NOT NULL,
+  `attack_power` int NOT NULL,
+  `move_speed` float NOT NULL,
+  `version` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+
+-- 함대 생산 비용 및 시간 정보
+CREATE TABLE `production_data` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `target_id` int NOT NULL,
+  `production_time` float NOT NULL,
+  `mineral_cost` int NOT NULL,
+  `gas_cost` int NOT NULL,
+  `supply_cost` int NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci

@@ -174,9 +174,9 @@ sequenceDiagram
 - **락스텝(Lockstep) 동기화 사용**: 모든 클라이언트가 동일한 틱에서 동일한 명령 실행
 
 #### 2.3.3 명령 패턴 (Command Pattern)
-- 모든 플레이어 행동은 Command 객체로 캡슐화
-- 명령 큐를 통한 순차 처리
-- 명령 취소, 재실행 가능
+- 모든 플레이어의 행동을 `Command` 객체로 캡슐화하여 요청과 실행을 분리합니다.
+- `Command` 객체는 명령 큐를 통해 순차적으로 처리되며, 이는 락스텝 동기화와 리플레이 기능 구현의 핵심 기반이 됩니다.
+- (상세한 클래스 구조 및 프로토콜은 6.2.2 항목 참조)
 
 #### 2.3.4 이벤트 기반 (Event-Driven)
 - 상태 변화는 Event로 브로드캐스트
@@ -224,17 +224,20 @@ sequenceDiagram
 
 #### 3.1.2 Fleet (함대)
 
+함대 엔티티는 `fleet_info` 테이블에 정의된 함대 종류별 기본 능력치와, 게임 런타임에 동적으로 관리되는 인스턴스 데이터를 조합하여 구성됩니다.
+
+**DB 테이블: `fleet_info` (함대 종류별 기본 능력치)**
+- `fleet_info` 테이블은 각 함대 종류(Scout, Fighter 등)의 `max_health`, `attack_power`, `move_speed`와 같은 고정된 능력치를 제공합니다.
+- `production_data` 테이블은 각 함대 종류의 생산 비용 및 시간을 제공합니다.
+
 **런타임 데이터 (DB 미저장, 게임 메모리에서만 관리)**
 
 | 속성 | 타입 | 설명 |
 |------|------|------|
-| Id | int | 함대 ID (게임 내 자동 증가) |
-| Type | FleetType | 함대 종류 (Scout/Fighter/Cruiser/Battleship) |
+| Id | int | 함대 인스턴스 ID (게임 내 자동 증가) |
+| FleetTypeId | int | `fleet_info` 테이블의 `fleet_type_id` 참조 |
 | OwnerId | int | 소유 플레이어 ID (1 또는 2) |
 | CurrentHealth | int | 현재 체력 |
-| MaxHealth | int | 최대 체력 |
-| AttackPower | int | 공격력 |
-| MoveSpeed | float | 이동 속도 |
 | Location | FleetLocation | 위치 정보 |
 | State | FleetState | 상태 (Idle/Garrison/Moving/InCombat/Constructing) |
 
@@ -304,7 +307,8 @@ sequenceDiagram
 - `planet_info` - 행성 정보 (name, mineral, gas, supply)
 - `map_planets` - 맵별 행성 배치 (position_x, position_y)
 - `planet_routes` - 행성 간 연결 정보
-
+- `fleet_info` - 함대 기본 스탯 정보
+- `production_data` - 생산 정보
 #### 3.2.2 DB 테이블화 예정 항목
 
 다음 요소들은 현재 메모리/하드코딩으로 관리되지만, Phase 4 이전에 DB 테이블로 마이그레이션 예정입니다.
@@ -357,21 +361,7 @@ sequenceDiagram
   - current_rank (INT, 현재 순위)
   - updated_at (DATETIME)
 
-**5. 함대 타입 설정 (`fleet_types`)**
-- 필요 이유: 밸런스 패치 시 서버 재시작 없이 조정 가능
-- 예정 컬럼:
-  - fleet_type_id (PK, AUTO_INCREMENT)
-  - type_name (VARCHAR, Scout/Fighter/Cruiser/Battleship)
-  - max_health (INT)
-  - attack_power (INT)
-  - move_speed (FLOAT)
-  - mineral_cost (INT)
-  - gas_cost (INT)
-  - supply_cost (INT)
-  - production_time (INT, 초 단위)
-  - version (VARCHAR, 밸런스 패치 버전)
-
-**6. 게임 설정 (`game_config`)**
+**5. 게임 설정 (`game_config`)**
 - 필요 이유: 서버 재시작 없이 게임 밸런스 조정
 - 예정 컬럼:
   - config_key (PK, VARCHAR) - 예: "tick_rate", "resource_tick_rate"
@@ -379,7 +369,7 @@ sequenceDiagram
   - description (VARCHAR)
   - updated_at (DATETIME)
 
-**7. AI 난이도 설정 (`ai_difficulty_levels`)**
+**6. AI 난이도 설정 (`ai_difficulty_levels`)**
 - 필요 이유: 유연한 난이도 밸런싱
 - 예정 컬럼:
   - difficulty_id (PK, AUTO_INCREMENT)
@@ -388,7 +378,7 @@ sequenceDiagram
   - command_interval (FLOAT, 초)
   - resource_bonus_percent (INT, %)
 
-**8. 리플레이 메타데이터 (`replays`)**
+**7. 리플레이 메타데이터 (`replays`)**
 - 필요 이유: 리플레이 파일 관리 및 검색 (Phase 2 Week 9)
 - 예정 컬럼:
   - replay_id (PK, AUTO_INCREMENT)
@@ -450,17 +440,60 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A[1. 명령 처리<br/>Command Processing]
-    B[2. 자원 생산<br/>Resource Production]
-    C[3. 함대 생산<br/>Fleet Production]
-    D[4. 함대 이동<br/>Fleet Movement]
-    E[5. 전투 처리<br/>Combat Resolution]
-    F[6. 점령 처리<br/>Conquest Update]
-    G[7. AI 업데이트<br/>AI Decision Making]
-    H[8. 승리 조건 확인<br/>Victory Check]
-    I[9. 이벤트 브로드캐스트<br/>Event Broadcasting]
-
-    A --> B --> C --> D --> E --> F --> G --> H --> I
+    Start([틱 시작<br/>Tick Start<br/>50ms 간격])
+    
+    A[1 명령 처리<br/>Command Processing<br/>매 틱]
+    
+    B{틱 mod 4 == 0?<br/>Every 200ms}
+    B1[2 자원 생산<br/>Resource Production]
+    
+    C[3 함대 생산<br/>Fleet Production<br/>매 틱]
+    
+    D[4 함대 이동<br/>Fleet Movement<br/>매 틱]
+    
+    E{전투 발생?<br/>Combat?}
+    F[5 전투 처리<br/>Combat Resolution]
+    
+    G[6 점령 처리<br/>Conquest Update<br/>매 틱]
+    
+    H{틱 mod 20 == 0?<br/>Every 1초}
+    H1[7 AI 업데이트<br/>AI Decision Making]
+    
+    I{틱 mod 10 == 0?<br/>Every 500ms}
+    I1[8 승리 조건 확인<br/>Victory Check]
+    
+    J[9 이벤트 브로드캐스트<br/>Event Broadcasting<br/>매 틱]
+    
+    End([틱 종료<br/>Tick End<br/>다음 틱 대기])
+    
+    Victory{게임 종료?}
+    GameEnd([게임 종료])
+    
+    Start --> A
+    A --> B
+    B -->|Yes| B1
+    B -->|No| C
+    B1 --> C
+    C --> D
+    D --> E
+    E -->|Yes| F
+    E -->|No| G
+    F --> G
+    G --> H
+    H -->|Yes| H1
+    H -->|No| I
+    H1 --> I
+    I -->|Yes| I1
+    I -->|No| J
+    I1 --> Victory
+    Victory -->|No| J
+    Victory -->|Yes| GameEnd
+    J --> End
+    End --> Start
+    
+    style Start fill:#e1f5fe
+    style End fill:#e8f5e8
+    style GameEnd fill:#ffebee
 ```
 
 #### 4.1.3 틱 관리
@@ -940,12 +973,8 @@ public class GameClientModel
     public async Task<bool> ConnectAsync(string host, int port);
     public void Disconnect();
 
-    // 게임 명령 전송 (CommonLib.Protocol 사용)
-    public async Task ProduceFleetAsync(FleetType type);
-    public async Task MoveFleetAsync(int fleetId, int targetPlanetId);
-
-    // 락스텝 동기화
-    public void RegisterCommandForTick(int tickNumber, Protocol command);
+    // 게임 명령 전송 (통합된 Command 방식)
+    public async Task SubmitCommandAsync(Command command);
 
     // 프로토콜 수신 루프 (TCP 비동기 I/O)
     private async Task ReceiveLoopAsync();
@@ -983,8 +1012,7 @@ public interface ITestView
     // View가 발생시키는 이벤트 (사용자 입력)
     event Action<string, int>? OnConnectRequested;
     event Action? OnDisconnectRequested;
-    event Action<FleetType>? OnProduceFleetRequested;
-    event Action<int, int>? OnMoveFleetRequested;  // fleetId, targetPlanetId
+    event Action<Command>? OnCommandRequested; // 통합된 Command 요청 이벤트
 
     // Presenter가 호출하는 메서드 (UI 업데이트)
     void ShowConnectionStatus(bool isConnected, string message);
@@ -1156,16 +1184,31 @@ public class ResourceTestPresenter
 - Protocol 객체 생성 → 데이터 추가 → 바이너리로 직렬화 → TCP 전송
 - 수신: TCP 스트림 → 바이너리 역직렬화 → Protocol 객체 복원
 
-**예시 코드 (함대 생산 명령)**
+**예시 코드 (게임 명령 전송)**
 ```csharp
 // 송신 (클라이언트 → 서버)
-Protocol protocol = new Protocol(ProtocolType.PRODUCE_FLEET);
-protocol.AddData("fleetType", (int)FleetType.Fighter);
+// 1. 구체적인 Command 객체 생성
+var command = new ProduceFleetCommand
+{
+    PlayerId = 1,
+    TickNumber = 12345, // 실제로는 동기화된 미래의 틱 번호
+    FleetToProduce = FleetType.Fighter
+};
+
+// 2. SUBMIT_COMMAND 프로토콜에 담아 전송
+Protocol protocol = new Protocol(3010); // SUBMIT_COMMAND
+protocol.AddData("commandType", (int)command.Type); // 타입 식별자
+protocol.AddData("commandData", JsonSerializer.Serialize(command)); // 직렬화된 데이터
 await SendProtocolAsync(protocol);
 
+
 // 수신 및 처리 (서버)
+// (자세한 내용은 6.2.2 항목 참조)
 Protocol receivedProtocol = await ReceiveProtocolAsync();
-int fleetType = receivedProtocol.GetData<int>("fleetType");
+if (receivedProtocol.Type == 3010) // SUBMIT_COMMAND
+{
+    // CommandFactory 등을 통해 역직렬화하여 커맨드 큐에 추가
+}
 ```
 
 ### 6.2 프로토콜 타입 정의
@@ -1209,16 +1252,48 @@ int fleetType = receivedProtocol.GetData<int>("fleetType");
 
 #### 6.2.2 클라이언트 → 서버 (Game Commands)
 
-**3003 - PRODUCE_FLEET (함대 생산 요청)**
-- 방향: 클라이언트 → 서버
-- 파라미터:
-  - fleetType : int
+명령 패턴(2.3.3 참조) 도입에 따라, 개별 행동마다 프로토콜을 정의하는 대신 모든 게임 내 행동은 단일 프로토콜 `SUBMIT_COMMAND`를 통해 전송됩니다. 이를 통해 새로운 게임 기능을 추가할 때 프로토콜 수정 없이 `Command` 클래스만 추가하면 되므로 확장성이 극대화됩니다.
 
-**3004 - MOVE_FLEET (함대 이동 명령)**
+**3010 - SUBMIT_COMMAND (게임 명령 제출)**
 - 방향: 클라이언트 → 서버
+- 설명: 플레이어의 모든 게임 내 행동(함대 생산, 이동 등)을 서버에 제출합니다.
 - 파라미터:
-  - fleetId : int
-  - targetPlanetId : int
+  - **commandType**: `int` (어떤 종류의 커맨드인지 알려주는 '타입 식별자'. 예: `CommandType.PRODUCE_FLEET`)
+  - **commandData**: `String` (구체적인 `Command` 객체를 직렬화한 데이터. 예: `ProduceFleetCommand`의 JSON 데이터)
+
+- **처리 방식 (역직렬화)**:
+  1. 서버는 `SUBMIT_COMMAND` 프로토콜을 수신하면, 먼저 `commandType` 파라미터를 읽습니다.
+  2. `commandType`에 따라 `commandData`를 어떤 `Command` 클래스(예: `ProduceFleetCommand`)로 역직렬화해야 할지 결정합니다.
+  3. 역직렬화된 `Command` 객체를 게임 로직의 커맨드 큐에 추가합니다.
+
+**`Command` 클래스 설계 예시 (C#):**
+```csharp
+// 모든 명령의 기반이 되는 추상 클래스
+[Serializable]
+public abstract class Command
+{
+    public int PlayerId { get; set; }    // 누가
+    public long TickNumber { get; set; } // 언제
+    public abstract CommandType Type { get; } // 무엇을
+}
+
+// "함대 생산" 명령
+[Serializable]
+public class ProduceFleetCommand : Command
+{
+    public override CommandType Type => CommandType.PRODUCE_FLEET;
+    public FleetType FleetToProduce { get; set; } // 파라미터
+}
+
+// "함대 이동" 명령
+[Serializable]
+public class MoveFleetCommand : Command
+{
+    public override CommandType Type => CommandType.MOVE_FLEET;
+    public int FleetId { get; set; } // 파라미터 1
+    public int TargetPlanetId { get; set; } // 파라미터 2
+}
+```
 
 **3005 - HEARTBEAT (하트비트)**
 - 방향: 클라이언트 → 서버
@@ -1425,10 +1500,20 @@ await SendProtocolAsync(roomJoinedProtocol);
 
 **게임 명령 (함대 생산)**
 
-**클라이언트 → 서버 (함대 생산)**
+**클라이언트 → 서버 (게임 명령 제출)**
 ```csharp
-Protocol protocol = new Protocol(3003); // PRODUCE_FLEET
-protocol.AddData("fleetType", (int)FleetType.Fighter);
+// 1. ProduceFleetCommand 객체 생성
+var command = new ProduceFleetCommand
+{
+    PlayerId = 1,
+    TickNumber = 500, // 동기화된 미래의 틱
+    FleetToProduce = FleetType.Fighter
+};
+
+// 2. SUBMIT_COMMAND 프로토콜(3010)으로 전송
+Protocol protocol = new Protocol(3010); // SUBMIT_COMMAND
+protocol.AddData("commandType", (int)command.Type);
+protocol.AddData("commandData", JsonSerializer.Serialize(command));
 await SendProtocolAsync(protocol);
 ```
 
