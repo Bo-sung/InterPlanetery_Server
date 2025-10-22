@@ -1,8 +1,9 @@
 using ChatClientWPF.Views;
 using CommonLib;
+using CommonLib.Services;
+using CommonLib.TableData;
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 
 namespace ChatClientWPF.Presenters
@@ -10,7 +11,7 @@ namespace ChatClientWPF.Presenters
     public class MapDisplayPresenter
     {
         private readonly IMapDisplayView _view;
-        private MapData _mapData;
+        private MapData? _mapData;
 
         public MapDisplayPresenter(IMapDisplayView view)
         {
@@ -23,45 +24,39 @@ namespace ChatClientWPF.Presenters
         {
             try
             {
-                string planetFilePath = _view.PlanetFilePath;
-                string connectionFilePath = _view.ConnectionFilePath;
+                int mapId = _view.MapId;
 
-                if (string.IsNullOrWhiteSpace(planetFilePath) || !File.Exists(planetFilePath))
+                // MapService 인스턴스가 초기화되어 있는지 확인
+                MapService mapService;
+                try
                 {
-                    _view.ShowError("Planet data file path is invalid or empty.");
+                    mapService = MapService.Instance;
+                }
+                catch (InvalidOperationException)
+                {
+                    _view.ShowError("MapService is not initialized. Please ensure MapService.Initialize() is called first.");
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(connectionFilePath) || !File.Exists(connectionFilePath))
+                // DB에서 맵 데이터 로드
+                _mapData = mapService.LoadMapData(mapId);
+
+                if (_mapData == null)
                 {
-                    _view.ShowError("Connection data file path is invalid or empty.");
+                    _view.ShowError($"Map with ID {mapId} not found in database.");
                     return;
                 }
 
-                var planets = CsvDataManager.LoadData(planetFilePath, values =>
-                    new Planet(
-                        int.Parse(values[0]),
-                        values[1],
-                        Enum.Parse<PlanetType>(values[2]),
-                        new Vector2(float.Parse(values[3]), float.Parse(values[4]))
-                    )
-                );
+                // 연결 정보를 (FromId, ToId) 튜플 리스트로 변환
+                var connections = _mapData.Connections
+                    .Select(c => (c.planetFromId, c.planetToId))
+                    .ToList();
 
-                var connections = CsvDataManager.LoadData(connectionFilePath, values =>
-                    (from: int.Parse(values[0]), to: int.Parse(values[1]))
-                );
-
-                // LINQ를 사용하여 즉시 로드
-                var planetList = planets.ToList();
-                var connectionList = connections.ToList();
-
-                _mapData = new MapData("Custom Map", planetList, connectionList);
-
-                _view.DrawMap(_mapData);
+                _view.DrawMap(_mapData.Planets.ToList(), connections);
             }
             catch (Exception ex)
             {
-                _view.ShowError($"Failed to load or render map data:\n{ex.Message}");
+                _view.ShowError($"Failed to load or render map data:\n{ex.Message}\n{ex.StackTrace}");
             }
         }
 

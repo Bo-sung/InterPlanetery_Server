@@ -11,7 +11,7 @@ namespace CommonLib
         }
 
         public string GetFleetTypesQuery()
-        {
+        { 
             // QueryManager에서 SQL 쿼리 문자열을 가져와 그대로 반환합니다.
             return QueryManager.GetQuery("FleetMapper.getFleetTypes");
         }

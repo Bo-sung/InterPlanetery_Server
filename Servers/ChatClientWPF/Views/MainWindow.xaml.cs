@@ -1,6 +1,8 @@
 using System.Windows;
 using ChatClientWPF.Pages;
 using ChatClientWPF.Presenters;
+using CommonLib;
+using CommonLib.Services;
 
 namespace ChatClientWPF.Views
 {
@@ -26,6 +28,10 @@ namespace ChatClientWPF.Views
 		public MainWindow()
 		{
 			InitializeComponent();
+
+			// MapService 초기화 (GameDBRepository는 QueryManager를 사용하여 쿼리만 제공)
+			var gameDbRepository = new GameDBRepository();
+			MapService.Initialize(gameDbRepository);
 
             // 맵 시각화 페이지 초기화
             var mapPage = new MapDisplayPage();

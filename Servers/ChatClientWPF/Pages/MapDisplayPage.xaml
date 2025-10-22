@@ -14,10 +14,9 @@
         </Grid.RowDefinitions>
 
         <!-- 컨트롤 패널 -->
-        <GroupBox Grid.Row="0" Header="Map Data Loader" Padding="10">
+        <GroupBox Grid.Row="0" Header="Map Data Loader (DB)" Padding="10">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -27,18 +26,10 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Label Grid.Row="0" Grid.Column="0" Content="Planets File:" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="0" Grid.Column="1" x:Name="PlanetsFilePathTextBox" Margin="5" VerticalContentAlignment="Center"/>
-                <Button Grid.Row="0" Grid.Column="2" x:Name="BrowsePlanetsButton" Content="Browse..." Width="80" Margin="5" Click="BrowsePlanetsButton_Click"/>
+                <Label Grid.Row="0" Grid.Column="0" Content="Map ID:" VerticalAlignment="Center"/>
+                <TextBox Grid.Row="0" Grid.Column="1" x:Name="MapIdTextBox" Text="1" Margin="5" VerticalContentAlignment="Center"/>
 
-                <Label Grid.Row="1" Grid.Column="0" Content="Connections File:" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="1" Grid.Column="1" x:Name="ConnectionsFilePathTextBox" Margin="5" VerticalContentAlignment="Center"/>
-                <Button Grid.Row="1" Grid.Column="2" x:Name="BrowseConnectionsButton" Content="Browse..." Width="80" Margin="5" Click="BrowseConnectionsButton_Click"/>
-
-                <Label Grid.Row="2" Grid.Column="0" Content="Scale:" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="2" Grid.Column="1" x:Name="ScaleTextBox" Text="50.0" Margin="5" VerticalContentAlignment="Center"/>
-
-                <Button Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" x:Name="RenderMapButton" Content="Render Map" Margin="5" Padding="10,5" FontWeight="Bold" Click="RenderMapButton_Click"/>
+                <Button Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="RenderMapButton" Content="Load Map from DB" Margin="5" Padding="10,5" FontWeight="Bold" Click="RenderMapButton_Click"/>
             </Grid>
         </GroupBox>
 

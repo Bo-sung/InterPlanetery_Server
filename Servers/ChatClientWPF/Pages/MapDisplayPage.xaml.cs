@@ -1,6 +1,6 @@
 using ChatClientWPF.Views;
 using CommonLib;
-using Microsoft.Win32;
+using CommonLib.TableData;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,42 +16,39 @@ namespace ChatClientWPF.Pages
     {
         private readonly Dictionary<int, FrameworkElement> _planetUIElements = new Dictionary<int, FrameworkElement>();
 
-        public string PlanetFilePath => PlanetsFilePathTextBox.Text;
-        public string ConnectionFilePath => ConnectionsFilePathTextBox.Text;
-
-        public double Scale
+        public int MapId
         {
             get
             {
-                if (double.TryParse(ScaleTextBox.Text, out double scale))
+                if (int.TryParse(MapIdTextBox.Text, out int mapId))
                 {
-                    return scale;
+                    return mapId;
                 }
-                return 1.0; // 파싱 실패 시 기본값
+                return 1; // 파싱 실패 시 기본값
             }
         }
 
-        public event Action OnRenderMapClicked;
-        public event Action<int> OnPlanetSelected;
+        public event Action? OnRenderMapClicked;
+        public event Action<int>? OnPlanetSelected;
 
         public MapDisplayPage()
         {
             InitializeComponent();
         }
 
-        public void DrawMap(MapData mapData)
+        public void DrawMap(List<Planet> planets, List<(int FromId, int ToId)> connections)
         {
             MapCanvas.Children.Clear();
             _planetUIElements.Clear();
 
-            double scale = this.Scale;
+            const double scale = 50.0; // 고정 스케일
             double canvasWidth = MapCanvas.Width;
             double canvasHeight = MapCanvas.Height;
             double centerX = canvasWidth / 2;
             double centerY = canvasHeight / 2;
 
             // 1. 행성 그리기
-            foreach (var planet in mapData.Planets)
+            foreach (var planet in planets)
             {
                 var planetSize = GetPlanetSize(planet.Type);
                 var planetBrush = GetPlanetBrush(planet.Type);
@@ -93,7 +90,7 @@ namespace ChatClientWPF.Pages
             }
 
             // 2. 연결선 그리기
-            foreach (var conn in mapData.Connections)
+            foreach (var conn in connections)
             {
                 if (!_planetUIElements.ContainsKey(conn.FromId) || !_planetUIElements.ContainsKey(conn.ToId))
                     continue;
@@ -118,41 +115,6 @@ namespace ChatClientWPF.Pages
         public void ShowError(string message)
         {
             MessageBox.Show(message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-
-        public string ShowOpenFileDialog()
-        {
-            var dialog = new OpenFileDialog
-            {
-                Filter = "CSV Files (*.csv)|*.csv|All files (*.*)|*.*",
-                CheckFileExists = true,
-                CheckPathExists = true
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                return dialog.FileName;
-            }
-
-            return null;
-        }
-
-        private void BrowsePlanetsButton_Click(object sender, RoutedEventArgs e)
-        {
-            string filePath = ShowOpenFileDialog();
-            if (!string.IsNullOrEmpty(filePath))
-            {
-                PlanetsFilePathTextBox.Text = filePath;
-            }
-        }
-
-        private void BrowseConnectionsButton_Click(object sender, RoutedEventArgs e)
-        {
-            string filePath = ShowOpenFileDialog();
-            if (!string.IsNullOrEmpty(filePath))
-            {
-                ConnectionsFilePathTextBox.Text = filePath;
-            }
         }
 
         private void RenderMapButton_Click(object sender, RoutedEventArgs e)
