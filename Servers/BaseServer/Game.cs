@@ -29,15 +29,15 @@ namespace BaseServer
 
         private Dictionary<long, List<IGameCommand>> m_dic_Commands = new Dictionary<long, List<IGameCommand>>();
         private GameMap _gameMap; // GameMap 객체로 맵 관련 데이터와 로직 위임
-        private MapService _mapService; // MapService 의존성 주입
+        private MapManager _mapManager;
         private DBManager _dbManager;
 
         protected ClientSession[] players = new ClientSession[MAX_PLAYERS];
 
         public Game() 
         {
-            _mapService = MapService.Instance;
             _dbManager = DBManager.Instance;
+            _mapManager = MapManager.Instance;
         }
 
         public void EnqueueCommand(IGameCommand command)
@@ -69,7 +69,7 @@ namespace BaseServer
             // 게임 시작 로직 구현
 
             // 맵 데이터 로드 (MapService 사용)
-            MapData staticMapData = _mapService.LoadMapData(mapIndex);
+            MapData staticMapData = _mapManager.LoadMapData(mapIndex);
             if (staticMapData == null)
             {
                 Console.WriteLine("[Game] Invalid map index.");

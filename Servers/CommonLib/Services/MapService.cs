@@ -136,7 +136,7 @@ namespace CommonLib.Services
                 mapPlanets = new List<Planet>();
                 foreach (var item in mapPlanetInfos)
                 {
-                    var planetInfo = PlanetInfo.Find(c => c.Id == item.planetId);
+                    var planetInfo = PlanetInfo.Find(c => c.id == item.planetId);
                     if (planetInfo == null)
                         continue;
                     mapPlanets.Add(new Planet(planetInfo, new Vector2(item.PositionX, item.PositionY)));

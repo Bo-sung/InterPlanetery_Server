@@ -58,9 +58,9 @@ namespace CommonLib.TableData
                 string Description = reader[colNames[2]]?.ToString();
                 if (String.IsNullOrEmpty(Description))
                     continue;
-                if (!int.TryParse(reader[colNames[2]].ToString(), out int Player1_HomeID))
+                if (!int.TryParse(reader[colNames[3]].ToString(), out int Player1_HomeID))
                     continue;
-                if (!int.TryParse(reader[colNames[3]].ToString(), out int Player2_HomeID))
+                if (!int.TryParse(reader[colNames[4]].ToString(), out int Player2_HomeID))
                     continue;
                 MapInfoData data = new MapInfoData(
                     id: id,
