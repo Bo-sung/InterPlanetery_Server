@@ -32,7 +32,7 @@ namespace BaseServer
         private MapManager _mapManager;
         private DBManager _dbManager;
 
-        protected ClientSession[] players = new ClientSession[MAX_PLAYERS];
+        protected ClientSession?[] players = new ClientSession[MAX_PLAYERS];
 
         public Game() 
         {
@@ -56,19 +56,33 @@ namespace BaseServer
 
         public void UserJoin(ClientSession player)
         {
-            // 플레이어가 게임에 참여할 때의 로직 구현
+            for (int i = 0; i < MAX_PLAYERS; i++)
+            {
+                if(players[i] != null)
+                    continue;
+
+                players[i] = player;
+            }
         }
 
         public void UserLeave(ClientSession player)
         {
-            // 플레이어가 게임에서 나갈 때의 로직 구현
+            for (int i = 0; i < MAX_PLAYERS; i++)
+            {
+                // 플레이어가 null 이 아니고. 입력받은 유저와 같을때 null로 변경
+                if (players[i] != null ? players[i].Equals(player) : false)
+                {
+                    players[i] = null;
+                    break;
+                }
+            }
         }
 
         public async Task StartGame(int mapIndex = 0)
         {
             // 게임 시작 로직 구현
 
-            // 맵 데이터 로드 (MapService 사용)
+            // 맵 데이터 로드
             MapData staticMapData = _mapManager.LoadMapData(mapIndex);
             if (staticMapData == null)
             {
