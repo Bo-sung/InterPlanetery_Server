@@ -9,6 +9,11 @@
 [Bb]in/
 [Oo]bj/
 
+# Configuration files with sensitive data
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+
 # Rider
 .idea/
 

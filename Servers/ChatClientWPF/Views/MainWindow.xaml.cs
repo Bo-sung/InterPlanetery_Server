@@ -29,9 +29,14 @@ namespace ChatClientWPF.Views
 		{
 			InitializeComponent();
 
-			// MapService 초기화 (GameDBRepository는 QueryManager를 사용하여 쿼리만 제공)
+			// AppConfig 초기화 및 확인
+			System.Diagnostics.Debug.WriteLine("=== MainWindow 초기화 ===");
+			var config = CommonLib.AppConfig.Instance;
+			System.Diagnostics.Debug.WriteLine($"AppConfig loaded. DB Server: {config.DatabaseServer}");
+
+			// MapService 초기화 (SingletonBase 패턴 사용)
 			var gameDbRepository = new GameDBRepository();
-			MapService.Initialize(gameDbRepository);
+			MapService.Instance.Initialize(gameDbRepository);
 
             // 맵 시각화 페이지 초기화
             var mapPage = new MapDisplayPage();

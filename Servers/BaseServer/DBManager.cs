@@ -7,7 +7,6 @@ namespace BaseServer
     public sealed class DBManager : SingletonBase<DBManager>
     {
         private readonly object _Updatelock = new object();
-        private const string _connectionString = "server=localhost;user=root;password=asdf1358@@;database=interplanetery_tabledb_local;";
         private DB_Table m_db_Table = new DB_Table();
         public DB_Table Table => m_db_Table;
 
@@ -15,13 +14,17 @@ namespace BaseServer
         {
             lock (_Updatelock)
             {
-                m_db_Table.UpdateTable(_connectionString);
+                // AppConfig에서 연결 문자열 가져오기
+                string connectionString = CommonLib.AppConfig.Instance.DatabaseConnectionString;
+                m_db_Table.UpdateTable(connectionString);
             }
         }
 
         public void TryConnect()
         {
-            using (MySqlConnection connection = new MySqlConnection(_connectionString))
+            // AppConfig에서 연결 문자열 가져오기
+            string connectionString = CommonLib.AppConfig.Instance.DatabaseConnectionString;
+            using (MySqlConnection connection = new MySqlConnection(connectionString))
             {
                 connection.Open();
 
