@@ -25,6 +25,11 @@
                 <Frame x:Name="MapFrame" NavigationUIVisibility="Hidden" />
             </TabItem>
 
+            <!-- Table Viewer 탭 -->
+            <TabItem Header="Table Viewer">
+                <Frame x:Name="TableFrame" NavigationUIVisibility="Hidden" />
+            </TabItem>
+
             <!-- 추가 테스트 탭 (향후 확장용) -->
             <TabItem Header="Performance Test">
                 <Grid>

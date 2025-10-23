@@ -42,6 +42,11 @@ namespace ChatClientWPF.Views
             var mapPage = new MapDisplayPage();
             var mapPresenter = new MapDisplayPresenter(mapPage);
             MapFrame.Content = mapPage;
+
+			// 테이블 뷰어 페이지 초기화
+			var tablePage = new TableViewPage();
+			var tablePresenter = new TableViewPresenter(tablePage);
+			TableFrame.Content = tablePage;
 		}
 	}
 }
