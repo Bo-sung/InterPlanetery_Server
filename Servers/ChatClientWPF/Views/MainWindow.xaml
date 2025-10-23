@@ -5,12 +5,51 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:pages="clr-namespace:ChatClientWPF.Pages"
         mc:Ignorable="d"
-        Title="InterPlanetery Test Tool" Height="650" Width="950"
-        WindowStartupLocation="CenterScreen">
+        Title="InterPlanetery Test Tool" Height="700" Width="1200"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}">
 
     <Grid>
         <!-- TabControl로 여러 테스트 페이지 관리 -->
-        <TabControl Margin="10">
+        <TabControl Margin="0" Background="{StaticResource BackgroundBrush}" BorderThickness="0">
+            <TabControl.Resources>
+                <!-- TabItem 스타일 -->
+                <Style TargetType="TabItem">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="TabItem">
+                                <Border Name="Border"
+                                        Background="{StaticResource SurfaceBrush}"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1,1,1,0"
+                                        CornerRadius="3,3,0,0"
+                                        Margin="2,0,0,0"
+                                        Padding="15,10">
+                                    <ContentPresenter x:Name="ContentSite"
+                                                    VerticalAlignment="Center"
+                                                    HorizontalAlignment="Center"
+                                                    ContentSource="Header"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Border" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                                        <Setter TargetName="Border" Property="BorderThickness" Value="1,1,1,0"/>
+                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="False">
+                                        <Setter TargetName="Border" Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Border" Property="Background" Value="{StaticResource SurfaceHoverBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </TabControl.Resources>
             <!-- Chat Test 탭 -->
             <TabItem Header="Chat Test">
                 <Frame x:Name="ChatFrame" NavigationUIVisibility="Hidden">
@@ -30,24 +69,29 @@
                 <Frame x:Name="TableFrame" NavigationUIVisibility="Hidden" />
             </TabItem>
 
+            <!-- Settings 탭 -->
+            <TabItem Header="Settings">
+                <Frame x:Name="SettingsFrame" NavigationUIVisibility="Hidden" />
+            </TabItem>
+
             <!-- 추가 테스트 탭 (향후 확장용) -->
             <TabItem Header="Performance Test">
-                <Grid>
+                <Grid Background="{StaticResource BackgroundBrush}">
                     <TextBlock Text="Performance Test Page (Coming Soon...)"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               FontSize="16"
-                               Foreground="Gray"/>
+                               FontSize="18"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
                 </Grid>
             </TabItem>
 
             <TabItem Header="Stress Test">
-                <Grid>
+                <Grid Background="{StaticResource BackgroundBrush}">
                     <TextBlock Text="Stress Test Page (Coming Soon...)"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               FontSize="16"
-                               Foreground="Gray"/>
+                               FontSize="18"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
                 </Grid>
             </TabItem>
         </TabControl>

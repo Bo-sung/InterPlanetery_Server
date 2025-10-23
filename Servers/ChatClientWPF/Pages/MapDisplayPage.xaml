@@ -1,58 +1,64 @@
 <Page x:Class="ChatClientWPF.Pages.MapDisplayPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-      mc:Ignorable="d" 
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      Style="{StaticResource PageStyle}"
       d:DesignHeight="800" d:DesignWidth="1200"
       Title="MapDisplayPage">
 
-    <Grid Margin="10">
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- 컨트롤 패널 -->
-        <GroupBox Grid.Row="0" Header="Map Data Loader (DB)" Padding="10">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <Border Grid.Row="0" Style="{StaticResource SectionBorderStyle}" Margin="0,0,0,15">
+            <StackPanel>
+                <TextBlock Text="Map Data Loader" Style="{StaticResource SectionHeaderStyle}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="200"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <Label Grid.Row="0" Grid.Column="0" Content="Map ID:" VerticalAlignment="Center"/>
-                <TextBox Grid.Row="0" Grid.Column="1" x:Name="MapIdTextBox" Text="1" Margin="5" VerticalContentAlignment="Center"/>
+                    <TextBlock Grid.Column="0" Text="Map ID:" Style="{StaticResource LabelStyle}" Margin="0,0,10,0"/>
+                    <TextBox Grid.Column="1" x:Name="MapIdTextBox" Text="1" Style="{StaticResource TextBoxStyle}"/>
 
-                <Button Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="RenderMapButton" Content="Load Map from DB" Margin="5" Padding="10,5" FontWeight="Bold" Click="RenderMapButton_Click"/>
-            </Grid>
-        </GroupBox>
+                    <Button Grid.Column="3" x:Name="RenderMapButton" Content="Load Map from DB" Style="{StaticResource PrimaryButtonStyle}" Click="RenderMapButton_Click"/>
+                </Grid>
+            </StackPanel>
+        </Border>
 
         <!-- 맵 디스플레이 -->
-        <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="0,10,0,0">
+        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="5">
             <Grid>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                    <Canvas x:Name="MapCanvas" Background="#1C1C1C" Width="2000" Height="1500">
+                    <Canvas x:Name="MapCanvas" Background="#FF1C1C1C" Width="2000" Height="1500">
                         <!-- 행성과 경로가 여기에 그려집니다 -->
                     </Canvas>
                 </ScrollViewer>
 
                 <!-- 행성 정보 표시 (오른쪽 하단) -->
                 <Border x:Name="PlanetInfoPanel"
-                        Background="#333333A0"
+                        Background="#AA252526"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
                         CornerRadius="5"
-                        Padding="10"
+                        Padding="15"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
                         Margin="20"
                         Visibility="Collapsed"
                         IsHitTestVisible="False">
-                    <TextBlock x:Name="PlanetInfoText" Foreground="White"/>
+                    <TextBlock x:Name="PlanetInfoText"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontSize="13"
+                               FontFamily="Consolas"/>
                 </Border>
             </Grid>
         </Border>

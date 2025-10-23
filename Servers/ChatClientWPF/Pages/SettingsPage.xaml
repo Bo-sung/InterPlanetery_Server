@@ -1,0 +1,196 @@
+<Page x:Class="ChatClientWPF.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      mc:Ignorable="d"
+      Style="{StaticResource PageStyle}"
+      Title="Settings">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="20"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- 헤더 -->
+            <TextBlock Grid.Row="0"
+                       Text="Application Settings"
+                       Style="{StaticResource PageHeaderStyle}"/>
+
+            <!-- Database 설정 섹션 -->
+            <Border Grid.Row="2" Style="{StaticResource SectionBorderStyle}">
+                <StackPanel>
+                    <!-- 섹션 헤더 -->
+                    <TextBlock Text="Database Configuration"
+                               Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <!-- Server -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Server:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="DatabaseServerTextBox"
+                                 Style="{StaticResource TextBoxStyle}"/>
+                    </Grid>
+
+                    <!-- User ID -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="User ID:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="DatabaseUserIdTextBox"
+                                 Style="{StaticResource TextBoxStyle}"/>
+                    </Grid>
+
+                    <!-- Password -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Password:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <PasswordBox Grid.Column="1"
+                                     x:Name="DatabasePasswordBox"
+                                     Style="{StaticResource PasswordBoxStyle}"/>
+                    </Grid>
+
+                    <!-- Database Name -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Database Name:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="DatabaseNameTextBox"
+                                 Style="{StaticResource TextBoxStyle}"/>
+                    </Grid>
+
+                    <!-- Port -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Port:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="DatabasePortTextBox"
+                                 Style="{StaticResource TextBoxStyle}"/>
+                    </Grid>
+
+                    <!-- 연결 문자열 미리보기 -->
+                    <Border Background="{StaticResource BackgroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="10"
+                            Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Connection String Preview:"
+                                       Style="{StaticResource TextSecondaryStyle}"
+                                       Margin="0,0,0,5"/>
+                            <TextBlock x:Name="ConnectionStringPreview"
+                                       Text="server=localhost;user=root;password=***;database=dbname;port=3306;"
+                                       Foreground="{StaticResource SuccessBrush}"
+                                       FontSize="11"
+                                       FontFamily="Consolas"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Server 설정 섹션 -->
+            <Border Grid.Row="4" Style="{StaticResource SectionBorderStyle}">
+                <StackPanel>
+                    <!-- 섹션 헤더 -->
+                    <TextBlock Text="Server Configuration"
+                               Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <!-- Host -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Host:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="ServerHostTextBox"
+                                 Style="{StaticResource TextBoxStyle}"/>
+                    </Grid>
+
+                    <!-- Port -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="Port:"
+                                   Style="{StaticResource LabelStyle}"/>
+                        <TextBox Grid.Column="1"
+                                 x:Name="ServerPortTextBox"
+                                 Style="{StaticResource TextBoxStyle}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 버튼 영역 -->
+            <StackPanel Grid.Row="6"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <!-- Test Connection 버튼 -->
+                <Button x:Name="TestConnectionButton"
+                        Content="Test Connection"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="0,0,10,0"
+                        Click="TestConnectionButton_Click"/>
+
+                <!-- Save 버튼 -->
+                <Button x:Name="SaveButton"
+                        Content="Save Settings"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Margin="0,0,10,0"
+                        Click="SaveButton_Click"/>
+
+                <!-- Reload 버튼 -->
+                <Button x:Name="ReloadButton"
+                        Content="Reload from File"
+                        Style="{StaticResource WarningButtonStyle}"
+                        Margin="0,0,10,0"
+                        Click="ReloadButton_Click"/>
+
+                <!-- Overwrite File 버튼 -->
+                <Button x:Name="OverwriteFileButton"
+                        Content="Overwrite to File"
+                        Style="{StaticResource DangerButtonStyle}"
+                        Click="OverwriteFileButton_Click"/>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

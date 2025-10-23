@@ -47,6 +47,11 @@ namespace ChatClientWPF.Views
 			var tablePage = new TableViewPage();
 			var tablePresenter = new TableViewPresenter(tablePage);
 			TableFrame.Content = tablePage;
+
+			// 설정 페이지 초기화
+			var settingsPage = new SettingsPage();
+			var settingsPresenter = new SettingsPresenter(settingsPage);
+			SettingsFrame.Content = settingsPage;
 		}
 	}
 }

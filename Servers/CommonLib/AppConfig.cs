@@ -235,6 +235,99 @@ namespace CommonLib
         }
 
         /// <summary>
+        /// 현재 설정을 appsettings.json 파일에 저장합니다.
+        /// </summary>
+        public void SaveConfig(ConfigData config)
+        {
+            lock (_configLock)
+            {
+                try
+                {
+                    string configPath = ConfigFilePath;
+                    System.Diagnostics.Debug.WriteLine($"=== AppConfig SaveConfig ===");
+                    System.Diagnostics.Debug.WriteLine($"Saving config to: {configPath}");
+
+                    // JSON으로 직렬화 (들여쓰기 포함)
+                    string json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
+
+                    // 파일에 저장
+                    File.WriteAllText(configPath, json);
+
+                    // 내부 설정 업데이트
+                    _config = config;
+
+                    System.Diagnostics.Debug.WriteLine($"[INFO] Configuration saved successfully to: {configPath}");
+                    Console.WriteLine($"[INFO] Configuration saved to: {configPath}");
+                    LogCurrentConfig();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to save config: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
+                    Console.WriteLine($"[ERROR] Failed to save config: {ex.Message}");
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 현재 설정 데이터를 반환합니다.
+        /// </summary>
+        public ConfigData GetCurrentConfig()
+        {
+            EnsureConfigLoaded();
+            return _config ?? GetDefaultConfig();
+        }
+
+        /// <summary>
+        /// 현재 메모리의 설정을 appsettings.json 파일에 덮어씁니다.
+        /// </summary>
+        public void OverwriteConfigFile()
+        {
+            lock (_configLock)
+            {
+                try
+                {
+                    EnsureConfigLoaded();
+
+                    string configPath = ConfigFilePath;
+                    System.Diagnostics.Debug.WriteLine($"=== AppConfig OverwriteConfigFile ===");
+                    System.Diagnostics.Debug.WriteLine($"Overwriting config to: {configPath}");
+
+                    if (_config == null)
+                    {
+                        throw new InvalidOperationException("No configuration loaded in memory.");
+                    }
+
+                    // JSON으로 직렬화 (들여쓰기 포함)
+                    string json = JsonSerializer.Serialize(_config, new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    });
+
+                    // 파일에 덮어쓰기
+                    File.WriteAllText(configPath, json);
+
+                    System.Diagnostics.Debug.WriteLine($"[INFO] Configuration file overwritten successfully: {configPath}");
+                    Console.WriteLine($"[INFO] Configuration file overwritten: {configPath}");
+                    LogCurrentConfig();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to overwrite config file: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
+                    Console.WriteLine($"[ERROR] Failed to overwrite config file: {ex.Message}");
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
         /// 설정이 로드되었는지 확인하고, 로드되지 않았으면 로드합니다.
         /// </summary>
         private void EnsureConfigLoaded()
