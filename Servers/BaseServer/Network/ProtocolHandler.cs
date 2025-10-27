@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using CommonLib;
 
-namespace BaseServer
+namespace BaseServer.Network
 {
 	/// <summary>
 	/// 프로토콜 핸들러 - 딕셔너리 기반 이벤트 처리

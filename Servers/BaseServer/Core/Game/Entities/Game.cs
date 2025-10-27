@@ -1,5 +1,6 @@
-﻿using BaseServer;
-using CommonLib.Commands; // IGameCommand
+using BaseServer.Core.Game.Session;
+using BaseServer.Database;
+﻿using CommonLib.Commands; // IGameCommand
 using CommonLib.Services; // MapService
 using CommonLib.TableData; // MapData, Planet
 using System;
@@ -7,7 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace BaseServer
+namespace BaseServer.Core.Game.Entities
 {
     public class Game
     {

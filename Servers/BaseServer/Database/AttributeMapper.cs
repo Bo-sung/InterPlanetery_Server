@@ -3,7 +3,7 @@ using System.Reflection;
 using CommonLib.TableData;
 using MySql.Data.MySqlClient;
 
-namespace BaseServer
+namespace BaseServer.Database
 {
     public static class AttributeMapper
     {

@@ -1,4 +1,4 @@
-﻿namespace BaseServer
+﻿namespace BaseServer.Utils
 {
     /// <summary>
     /// 스레드 세이프한 싱글톤 베이스 클래스

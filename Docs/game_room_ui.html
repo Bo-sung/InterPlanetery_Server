@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interplanetary - 게임 로비 & 대기방</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1f3a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* 공통 스타일 */
+        .panel {
+            background: #2a3050;
+            border: 1px solid #3d5a80;
+            border-radius: 4px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #98c1d9;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #3d5a80;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid #3d5a80;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: #3d5a80;
+            color: white;
+        }
+
+        .btn:hover {
+            background: #4d6a90;
+        }
+
+        .btn-primary {
+            background: #4a90e2;
+            border-color: #4a90e2;
+        }
+
+        .btn-primary:hover {
+            background: #5aa0f2;
+        }
+
+        .btn-success {
+            background: #2a9d8f;
+            border-color: #2a9d8f;
+        }
+
+        .btn-success:hover {
+            background: #3aad9f;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            border-color: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #f75c4c;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input, select {
+            background: #1a1f3a;
+            border: 1px solid #3d5a80;
+            border-radius: 4px;
+            padding: 10px;
+            color: #e0e0e0;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #98c1d9;
+        }
+
+        /* ==================== 로비 화면 ==================== */
+        .lobby-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+        }
+
+        /* 룸 목록 */
+        .room-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .room-filters {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .filter-label {
+            font-size: 14px;
+            color: #98c1d9;
+        }
+
+        .filter-select {
+            width: 120px;
+        }
+
+        .refresh-btn {
+            padding: 8px 16px;
+            background: #3d5a80;
+            border: 1px solid #3d5a80;
+            border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+
+        .refresh-btn:hover {
+            background: #4d6a90;
+        }
+
+        .room-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .room-card {
+            background: #1a1f3a;
+            border: 1px solid #3d5a80;
+            border-radius: 4px;
+            padding: 15px;
+            cursor: pointer;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .room-card:hover {
+            border-color: #98c1d9;
+        }
+
+        .room-card.full {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .room-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #98c1d9;
+            margin-bottom: 5px;
+        }
+
+        .room-details {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .room-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .room-status.waiting {
+            background: #2a9d8f;
+            color: white;
+        }
+
+        .room-status.full {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .room-status.playing {
+            background: #ffb703;
+            color: white;
+        }
+
+        .room-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* 오른쪽 패널 */
+        .create-room-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 14px;
+            color: #98c1d9;
+            font-weight: 500;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .user-info-panel {
+            background: #1a1f3a;
+            border-radius: 4px;
+            padding: 15px;
+        }
+
+        .user-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #98c1d9;
+            margin-bottom: 5px;
+        }
+
+        .user-status {
+            font-size: 13px;
+            color: #2a9d8f;
+        }
+
+        /* ==================== 대기방 화면 ==================== */
+        .waiting-room-container {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            height: 80vh;
+        }
+
+        .room-header {
+            grid-column: 1 / 3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .room-title-section {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .back-btn {
+            padding: 8px 16px;
+            background: #3d5a80;
+            border: 1px solid #3d5a80;
+            border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            background: #4d6a90;
+        }
+
+        .room-title-large {
+            font-size: 24px;
+            font-weight: bold;
+            color: #98c1d9;
+        }
+
+        .room-info-badge {
+            padding: 6px 12px;
+            background: #2a9d8f;
+            border-radius: 4px;
+            font-size: 14px;
+            color: white;
+        }
+
+        /* 플레이어 슬롯 */
+        .players-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .player-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .player-slot {
+            background: #1a1f3a;
+            border: 2px solid #3d5a80;
+            border-radius: 4px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .player-slot.occupied {
+            border-color: #4a90e2;
+        }
+
+        .player-slot.empty {
+            border-style: dashed;
+            opacity: 0.5;
+        }
+
+        .player-slot-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .player-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #4a90e2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .player-avatar.empty {
+            background: #3d5a80;
+            color: #666;
+        }
+
+        .player-name-large {
+            font-size: 18px;
+            font-weight: bold;
+            color: #98c1d9;
+        }
+
+        .player-role {
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .player-ready-status {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .player-ready-status.ready {
+            background: #2a9d8f;
+            color: white;
+        }
+
+        .player-ready-status.not-ready {
+            background: #ffb703;
+            color: white;
+        }
+
+        .game-settings {
+            background: #1a1f3a;
+            border-radius: 4px;
+            padding: 15px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #3d5a80;
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-size: 14px;
+            color: #98c1d9;
+        }
+
+        .setting-value {
+            font-size: 14px;
+            color: #e0e0e0;
+            font-weight: bold;
+        }
+
+        /* 채팅 패널 */
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-messages {
+            flex: 1;
+            background: #1a1f3a;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-username {
+            font-size: 13px;
+            font-weight: bold;
+            color: #4a90e2;
+        }
+
+        .chat-timestamp {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .chat-message-text {
+            font-size: 14px;
+            color: #e0e0e0;
+            padding: 8px 12px;
+            background: #2a3050;
+            border-radius: 4px;
+            border-left: 3px solid #4a90e2;
+        }
+
+        .chat-message.system .chat-message-text {
+            background: #1a1f3a;
+            border-left-color: #2a9d8f;
+            color: #2a9d8f;
+            font-style: italic;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1f3a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3d5a80;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4d6a90;
+        }
+
+        /* 탭 전환용 */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ==================== 로비 화면 ==================== -->
+        <div id="lobby-view" class="lobby-view">
+            <div class="lobby-container">
+                <!-- 왼쪽: 룸 목록 -->
+                <div class="room-list-section">
+                    <div class="panel">
+                        <div class="room-list-header">
+                            <div class="panel-title">게임 방 목록</div>
+                            <div class="room-filters">
+                                <span class="filter-label">상태:</span>
+                                <select class="filter-select">
+                                    <option value="all">전체</option>
+                                    <option value="waiting">대기중</option>
+                                    <option value="playing">게임중</option>
+                                </select>
+                                <button class="refresh-btn">새로고침</button>
+                            </div>
+                        </div>
+
+                        <div class="room-list">
+                            <!-- 룸 카드 1 -->
+                            <div class="room-card" onclick="joinRoom('room1')">
+                                <div class="room-info">
+                                    <div class="room-name">은하계 정복전</div>
+                                    <div class="room-details">
+                                        <span>플레이어: 1/2</span>
+                                        <span>맵: 3레인 전투장</span>
+                                    </div>
+                                </div>
+                                <div class="room-actions">
+                                    <div class="room-status waiting">대기중</div>
+                                    <button class="btn btn-primary">입장</button>
+                                </div>
+                            </div>
+
+                            <!-- 룸 카드 2 -->
+                            <div class="room-card" onclick="joinRoom('room2')">
+                                <div class="room-info">
+                                    <div class="room-name">에픽 전투</div>
+                                    <div class="room-details">
+                                        <span>플레이어: 1/2</span>
+                                        <span>맵: 쌍성계</span>
+                                    </div>
+                                </div>
+                                <div class="room-actions">
+                                    <div class="room-status waiting">대기중</div>
+                                    <button class="btn btn-primary">입장</button>
+                                </div>
+                            </div>
+
+                            <!-- 룸 카드 3 (풀방) -->
+                            <div class="room-card full">
+                                <div class="room-info">
+                                    <div class="room-name">고수만</div>
+                                    <div class="room-details">
+                                        <span>플레이어: 2/2</span>
+                                        <span>맵: 거울 세계</span>
+                                    </div>
+                                </div>
+                                <div class="room-actions">
+                                    <div class="room-status full">만원</div>
+                                    <button class="btn btn-primary" disabled>입장</button>
+                                </div>
+                            </div>
+
+                            <!-- 룸 카드 4 (진행중) -->
+                            <div class="room-card">
+                                <div class="room-info">
+                                    <div class="room-name">캐주얼 게임</div>
+                                    <div class="room-details">
+                                        <span>플레이어: 2/2</span>
+                                        <span>맵: 교차로</span>
+                                    </div>
+                                </div>
+                                <div class="room-actions">
+                                    <div class="room-status playing">게임중</div>
+                                    <button class="btn btn-primary" disabled>관전</button>
+                                </div>
+                            </div>
+
+                            <!-- 룸 카드 5 -->
+                            <div class="room-card" onclick="joinRoom('room5')">
+                                <div class="room-info">
+                                    <div class="room-name">초보환영</div>
+                                    <div class="room-details">
+                                        <span>플레이어: 1/2</span>
+                                        <span>맵: 단순 경로</span>
+                                    </div>
+                                </div>
+                                <div class="room-actions">
+                                    <div class="room-status waiting">대기중</div>
+                                    <button class="btn btn-primary">입장</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 오른쪽: 방 만들기 (상단) + 플레이어 정보 (하단) -->
+                <div class="create-room-section">
+                    <!-- 룸 생성 폼 -->
+                    <div class="panel">
+                        <div class="panel-title">새 방 만들기</div>
+
+                        <div class="form-group">
+                            <label class="form-label">방 이름</label>
+                            <input type="text" placeholder="방 이름을 입력하세요..." value="나의 방">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">맵 선택</label>
+                            <select>
+                                <option value="1">3레인 전투장</option>
+                                <option value="2">쌍성계</option>
+                                <option value="3">거울 세계</option>
+                                <option value="4">교차로</option>
+                                <option value="5">단순 경로</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="privateRoom">
+                                <label for="privateRoom" class="form-label">비공개 방</label>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-success" style="width: 100%; margin-top: 10px;" onclick="createRoom()">
+                            방 만들기
+                        </button>
+                    </div>
+
+                    <!-- 사용자 정보 -->
+                    <div class="panel">
+                        <div class="user-info-panel">
+                            <div class="user-name">플레이어_12345</div>
+                            <div class="user-status">● 접속중</div>
+                        </div>
+                        <button class="btn btn-danger" style="width: 100%; margin-top: 10px;">연결 종료</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== 대기방 화면 ==================== -->
+        <div id="waiting-room-view" class="waiting-room-view hidden">
+            <div class="waiting-room-container">
+                <!-- 상단 헤더 -->
+                <div class="room-header panel">
+                    <div class="room-title-section">
+                        <button class="back-btn" onclick="leaveRoom()">← 로비로 돌아가기</button>
+                        <div class="room-title-large">은하계 정복전</div>
+                        <div class="room-info-badge">맵: 3레인 전투장</div>
+                    </div>
+                    <button class="btn btn-success">준비 완료</button>
+                </div>
+
+                <!-- 왼쪽: 플레이어 슬롯 & 게임 설정 -->
+                <div class="players-section">
+                    <div class="panel">
+                        <div class="panel-title">플레이어 (1/2)</div>
+                        <div class="player-slots">
+                            <!-- 플레이어 1 (본인) -->
+                            <div class="player-slot occupied">
+                                <div class="player-slot-info">
+                                    <div class="player-avatar">P1</div>
+                                    <div class="player-details">
+                                        <div class="player-name-large">플레이어_12345</div>
+                                        <div class="player-role">방장 • 플레이어 1</div>
+                                    </div>
+                                </div>
+                                <div class="player-ready-status not-ready">대기중</div>
+                            </div>
+
+                            <!-- 플레이어 2 (빈 슬롯) -->
+                            <div class="player-slot empty">
+                                <div class="player-slot-info">
+                                    <div class="player-avatar empty">?</div>
+                                    <div class="player-details">
+                                        <div class="player-name-large" style="color: #666;">플레이어 대기중...</div>
+                                        <div class="player-role">플레이어 2</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 게임 설정 -->
+                    <div class="panel">
+                        <div class="panel-title">게임 설정</div>
+                        <div class="game-settings">
+                            <div class="setting-item">
+                                <span class="setting-label">맵</span>
+                                <span class="setting-value">3레인 전투장</span>
+                            </div>
+                            <div class="setting-item">
+                                <span class="setting-label">최대 플레이어</span>
+                                <span class="setting-value">2명</span>
+                            </div>
+                            <div class="setting-item">
+                                <span class="setting-label">시작 자원</span>
+                                <span class="setting-value">표준</span>
+                            </div>
+                            <div class="setting-item">
+                                <span class="setting-label">방 유형</span>
+                                <span class="setting-value">공개</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 오른쪽: 채팅 -->
+                <div class="chat-panel panel">
+                    <div class="panel-title">채팅</div>
+                    <div class="chat-messages">
+                        <!-- 시스템 메시지 -->
+                        <div class="chat-message system">
+                            <div class="chat-message-text">
+                                플레이어_12345님이 방을 생성했습니다
+                            </div>
+                        </div>
+
+                        <div class="chat-message system">
+                            <div class="chat-message-text">
+                                플레이어 입장을 기다리고 있습니다...
+                            </div>
+                        </div>
+
+                        <!-- 일반 채팅 메시지 -->
+                        <div class="chat-message">
+                            <div class="chat-message-header">
+                                <span class="chat-username">플레이어_12345</span>
+                                <span class="chat-timestamp">14:23</span>
+                            </div>
+                            <div class="chat-message-text">
+                                누구 같이 할 사람?
+                            </div>
+                        </div>
+
+                        <div class="chat-message">
+                            <div class="chat-message-header">
+                                <span class="chat-username">플레이어_12345</span>
+                                <span class="chat-timestamp">14:25</span>
+                            </div>
+                            <div class="chat-message-text">
+                                재밌게 해봐요!
+                            </div>
+                        </div>
+
+                        <div class="chat-message system">
+                            <div class="chat-message-text">
+                                2명의 플레이어가 모두 준비하면 게임이 자동으로 시작됩니다
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" placeholder="메시지를 입력하세요...">
+                        <button class="btn btn-primary">전송</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 화면 전환 함수들
+        function createRoom() {
+            document.getElementById('lobby-view').classList.add('hidden');
+            document.getElementById('waiting-room-view').classList.remove('hidden');
+        }
+
+        function joinRoom(roomId) {
+            console.log('방 입장:', roomId);
+            document.getElementById('lobby-view').classList.add('hidden');
+            document.getElementById('waiting-room-view').classList.remove('hidden');
+        }
+
+        function leaveRoom() {
+            document.getElementById('waiting-room-view').classList.add('hidden');
+            document.getElementById('lobby-view').classList.remove('hidden');
+        }
+
+        // 채팅 전송 (Enter 키)
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatInput = document.querySelector('.chat-input');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+        });
+
+        function sendMessage() {
+            const input = document.querySelector('.chat-input');
+            const message = input.value.trim();
+            if (message) {
+                console.log('메시지 전송:', message);
+                // 여기서 실제 메시지 전송 로직 구현
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

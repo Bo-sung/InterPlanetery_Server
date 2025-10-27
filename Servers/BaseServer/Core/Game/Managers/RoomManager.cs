@@ -1,3 +1,5 @@
+using BaseServer.Core.Game.Entities;
+using BaseServer.Core.Game.Session;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -5,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BaseServer
+namespace BaseServer.Core.Game.Managers
 {
     /// <summary>
     /// 게임 룸 관리 매니저 (싱글톤)

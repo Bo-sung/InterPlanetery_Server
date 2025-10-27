@@ -2,7 +2,7 @@
 using CommonLib.TableData;
 using MySql.Data.MySqlClient;
 
-namespace BaseServer
+namespace BaseServer.Database
 {
     /// <summary>
     /// 테이블 데이터 저장용

@@ -1,4 +1,7 @@
-﻿using System;
+using BaseServer.Core.Game.Entities;
+using BaseServer.Core.Game.Managers;
+using BaseServer.Network;
+using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -6,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CommonLib;
 
-namespace BaseServer
+namespace BaseServer.Core.Game.Session
 {
     /// <summary>
     /// 클라이언트 세션 관리 클래스
@@ -15,7 +18,7 @@ namespace BaseServer
     {
         public string SessionId { get; private set; }
         public TcpClient TcpClient { get; private set; }
-        public GameRoom? CurrentRoom { get; set; }
+        public Entities.GameRoom? CurrentRoom { get; set; }
 
         private NetworkStream m_stream;
         private bool m_isConnected = true;
@@ -62,7 +65,7 @@ namespace BaseServer
             try
             {
                 // 매칭하여 룸에 입장
-                GameRoom room = RoomManager.Instance.MatchPlayer(this);
+                Entities.GameRoom room = RoomManager.Instance.MatchPlayer(this);
 
                 if (room == null)
                 {
@@ -303,7 +306,7 @@ namespace BaseServer
         /// <summary>
         /// 입장 성공 메시지 전송
         /// </summary>
-        private async Task SendJoinSuccessAsync(GameRoom _room)
+        private async Task SendJoinSuccessAsync(Entities.GameRoom _room)
         {
             RoomInfo roomInfo = new RoomInfo
             {

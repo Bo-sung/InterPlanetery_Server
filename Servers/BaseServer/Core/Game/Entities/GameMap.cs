@@ -4,7 +4,7 @@ using System.Linq;
 using CommonLib.TableData; // MapData, Planet, Vector2
 using CommonLib; // Graph
 
-namespace BaseServer
+namespace BaseServer.Core.Game.Entities
 {
     public class GameMap
     {
