@@ -17,31 +17,8 @@ namespace CommonLib.TableData
         DwarfPlanet  // 왜소 행성
     }
 
-    /// <summary>
-    /// 개별 행성의 데이터를 나타내는 클래스
-    /// </summary>
-    public class Planet
-    {
-        PlanetInfoData mPlanetInfoData;
-        Vector2 mPlanetPosition;
-        public int Id => mPlanetInfoData.id;
-        public PlanetType Type => PlanetType.Terrestrial;// 일단 기본값
-        public Vector2 Position => mPlanetPosition;
-        public string Name => mPlanetInfoData.Name;
-        public int Mineral => mPlanetInfoData.Mineral;
-        public int Gas => mPlanetInfoData.Gas;
-        public int Supply => mPlanetInfoData.Supply;
-
-        public int OwnerId = -1;
-        public float ConquestProgress = 0;
-        public int GarrisonFleetId = -1;
-
-        public Planet(PlanetInfoData planetInfo, Vector2 Position)
-        {
-            this.mPlanetInfoData = planetInfo;
-            this.mPlanetPosition = Position;
-        }
-    }
+    // Planet class has been removed. Its server-side logic is now in GamePlanet.cs,
+    // and this file only contains shared data records and enums.
 
     public record PlanetInfoData(
        [DbColumn("id")] int id,

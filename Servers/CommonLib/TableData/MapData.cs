@@ -15,14 +15,16 @@ namespace CommonLib.TableData
     {
         public readonly MapInfoData mapInfoData;
         public string MapName => mapInfoData.Name;
-        public IReadOnlyList<Planet> Planets { get; private set; }
+        public IReadOnlyList<PlanetInfoData> PlanetInfos { get; private set; }
+        public IReadOnlyList<MapPlanetInfoData> PlanetLayouts { get; private set; }
         public IReadOnlyList<MapRouteInfoData> Connections { get; private set; }
 
-        public MapData(MapInfoData mapInfoData, IEnumerable<Planet> mapPlanetInfoDatas, IEnumerable<MapRouteInfoData> mapRouteInfoDatas)
+        public MapData(MapInfoData mapInfoData, IEnumerable<PlanetInfoData> planetInfos, IEnumerable<MapPlanetInfoData> planetLayouts, IEnumerable<MapRouteInfoData> connections)
         {
             this.mapInfoData = mapInfoData;
-            Planets = mapPlanetInfoDatas.ToList();
-            Connections = mapRouteInfoDatas.ToList();
+            this.PlanetInfos = planetInfos.ToList();
+            this.PlanetLayouts = planetLayouts.ToList();
+            this.Connections = connections.ToList();
         }
     }
 

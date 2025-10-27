@@ -1,5 +1,6 @@
 using CommonLib;
 using CommonLib.TableData;
+using ChatClientWPF.Models;
 using System;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,22 +19,22 @@ namespace ChatClientWPF.Controls
         /// <summary>
         /// 행성 데이터
         /// </summary>
-        public Planet? PlanetData { get; private set; }
+        public DisplayPlanet? PlanetData { get; private set; }
 
         /// <summary>
         /// 행성 클릭 이벤트
         /// </summary>
-        public event Action<Planet>? OnPlanetClicked;
+        public event Action<DisplayPlanet>? OnPlanetClicked;
 
         /// <summary>
         /// 마우스 진입 이벤트
         /// </summary>
-        public event Action<Planet>? OnPlanetMouseEnter;
+        public event Action<DisplayPlanet>? OnPlanetMouseEnter;
 
         /// <summary>
         /// 마우스 이탈 이벤트
         /// </summary>
-        public event Action<Planet>? OnPlanetMouseLeave;
+        public event Action<DisplayPlanet>? OnPlanetMouseLeave;
 
         public PlanetControl()
         {
@@ -48,7 +49,7 @@ namespace ChatClientWPF.Controls
         /// <summary>
         /// 행성 데이터를 설정하고 UI를 업데이트합니다.
         /// </summary>
-        public void SetPlanetData(Planet planet, double planetSize)
+        public void SetPlanetData(DisplayPlanet planet, double planetSize)
         {
             PlanetData = planet;
 
@@ -63,8 +64,8 @@ namespace ChatClientWPF.Controls
             PlanetGrid.Width = planetSize;
             PlanetGrid.Height = planetSize;
 
-            // 행성 색상 설정
-            PlanetEllipse.Fill = GetPlanetBrush(planet.Type);
+            // 행성 색상 설정 (임시로 Terrestrial 타입 사용)
+            PlanetEllipse.Fill = GetPlanetBrush(PlanetType.Terrestrial);
 
             // 행성 이름 설정
             PlanetNameText.Text = planet.Name;
@@ -83,7 +84,8 @@ namespace ChatClientWPF.Controls
             // 행성 원의 중심 = (행성크기/2, 행성크기/2)
             if (PlanetData == null) return new Point(0, 0);
 
-            double planetSize = GetPlanetSize(PlanetData.Type);
+            // 임시로 Terrestrial 타입 사용
+            double planetSize = GetPlanetSize(PlanetType.Terrestrial);
             return new Point(planetSize / 2, planetSize / 2);
         }
 

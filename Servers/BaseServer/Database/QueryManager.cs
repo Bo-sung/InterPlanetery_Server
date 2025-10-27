@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml.Linq;
 
-namespace CommonLib
+namespace BaseServer.Database
 {
     public static class QueryManager
     {

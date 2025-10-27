@@ -1,4 +1,4 @@
-﻿using CommonLib;
+using CommonLib;
 using CommonLib.Commands;
 using System;
 using System.Collections;
@@ -137,10 +137,11 @@ namespace BaseServer.Core.Game.Entities
             {
                 SenderId = _sender.SessionId,
                 Message = _message,
-                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                MessageType = 0 // 0: LOBBY
             };
 
-            Protocol protocol = new Protocol(ChatProtocolType.CHAT_BROADCAST)
+            Protocol protocol = new Protocol(ProtocolType.CHAT_BROADCAST)
                 .AddStruct("chatMessage", chatMsg);
 
             byte[] data = protocol.Serialize();
@@ -163,7 +164,7 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void BroadcastUserJoined(ClientSession _joinedSession)
         {
-            Protocol protocol = new Protocol(ChatProtocolType.USER_JOINED)
+            Protocol protocol = new Protocol(ProtocolType.USER_JOINED)
                 .AddParam("userId", _joinedSession.SessionId)
                 .AddParam("playerCount", m_players.Count);
 
@@ -183,7 +184,7 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void BroadcastUserLeft(ClientSession _leftSession)
         {
-            Protocol protocol = new Protocol(ChatProtocolType.USER_LEFT)
+            Protocol protocol = new Protocol(ProtocolType.USER_LEFT)
                 .AddParam("userId", _leftSession.SessionId)
                 .AddParam("playerCount", m_players.Count);
 
@@ -206,7 +207,7 @@ namespace BaseServer.Core.Game.Entities
                 playersCopy = new List<ClientSession>(m_players);
             }
 
-            Protocol protocol = new Protocol(ChatProtocolType.ROOM_CLOSED)
+            Protocol protocol = new Protocol(ProtocolType.ROOM_CLOSED)
                 .AddParam("roomId", RoomId)
                 .AddParam("reason", "Room has been closed");
 

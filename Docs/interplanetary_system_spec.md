@@ -126,36 +126,56 @@ stateDiagram-v2
 - 각 GameRoom은 독립적인 게임 루프 실행
 - 룸 간 간섭 없음 (완전 격리)
 
-#### 2.2.4 사용자 흐름
+#### 2.2.4 로비 진입 및 룸 목록 조회 흐름
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    C->>S: 3001 CONNECT (playerName, version)
+    S->>C: 4001 CONNECTED (sessionId, playerName, serverTime)
+
+    Note over C: 로비 진입
+
+    C->>S: 3103 GET_ROOM_LIST
+    S->>C: 4205 ROOM_LIST (rooms)
+
+    Note over C: 룸 목록 표시
+```
+
+#### 2.2.5 사용자 흐름
 
 ```mermaid
 sequenceDiagram
     participant C1 as Client 1
-    participant Server
-    participant Room
+    participant S as Server
     participant C2 as Client 2
 
-    C1->>Server: 연결 (CONNECT)
-    Server->>C1: 연결 성공
-    C1->>Server: 룸 생성 (CREATE_ROOM)
-    Server->>Room: GameRoom 생성
-    Server->>C1: 룸 생성 완료 (대기 중)
+    C1->>S: 3100 CREATE_ROOM (mapId, roomName, isPrivate)
+    S->>C1: 4200 ROOM_CREATED (roomId, roomName, mapId)
+    S->>C1: 4201 ROOM_JOINED (roomId, playerSlot=1, roomInfo)
 
-    C2->>Server: 연결 (CONNECT)
-    Server->>C2: 연결 성공
-    C2->>Server: 룸 참가 (JOIN_ROOM)
-    Server->>Room: Player 2 추가
-    Room->>C1: 상대방 참가 알림
-    Room->>C2: 참가 성공
+    Note over C1: 대기방 화면 표시<br/>플레이어 1 슬롯 표시
 
-    Room->>C1: 게임 시작 (GAME_STARTED)
-    Room->>C2: 게임 시작 (GAME_STARTED)
+    C2->>S: 3101 JOIN_ROOM (roomId)
+    S->>C2: 4201 ROOM_JOINED (roomId, playerSlot=2, roomInfo)
+    S->>C1: 4203 PLAYER_JOINED_ROOM (playerName, playerSlot=2)
 
-    Note over Room: 게임 진행 (2인 대전)
+    Note over C1,C2: 양쪽 모두 플레이어 2 슬롯 업데이트
 
-    Room->>C1: 게임 종료 (GAME_ENDED)
-    Room->>C2: 게임 종료 (GAME_ENDED)
-    Server->>Room: 룸 삭제
+    C1->>S: 3104 READY (isReady=true)
+    S->>C1: 4206 PLAYER_READY_STATE (playerSlot=1, isReady=true)
+    S->>C2: 4206 PLAYER_READY_STATE (playerSlot=1, isReady=true)
+
+    C2->>S: 3104 READY (isReady=true)
+    S->>C1: 4206 PLAYER_READY_STATE (playerSlot=2, isReady=true)
+    S->>C2: 4206 PLAYER_READY_STATE (playerSlot=2, isReady=true)
+
+    Note over S: 모든 플레이어 준비 완료
+
+    S->>C1: 4002 GAME_STARTED (gameId, mapId, players)
+    S->>C2: 4002 GAME_STARTED (gameId, mapId, players)
 ```
 
 ### 2.3 설계 원칙
@@ -797,6 +817,52 @@ if (receivedProtocol.Type == 3010) // SUBMIT_COMMAND
 
 게임 서버용 프로토콜 타입은 BaseServer의 채팅 프로토콜(1000~2999번)과 구분하기 위해 **3000번대(클라이언트→서버), 4000번대(서버→클라이언트)**를 사용합니다.
 
+#### 6.2.0 클라이언트 ↔ 서버 (기본 채팅)
+
+BaseServer에 구현된 기본 채팅 프로토콜을 사용하며, 로비와 인게임에서 모두 사용됩니다.
+
+**1003 - CHAT_MESSAGE (채팅 메시지 전송)**
+- 방향: 클라이언트 → 서버
+- 설명: 현재 입장한 룸(로비 또는 인게임)에 채팅 메시지를 전송합니다.
+- 파라미터:
+  - `message`: String
+
+**2006 - CHAT_BROADCAST (채팅 메시지 브로드캐스트)**
+- 방향: 서버 → 클라이언트
+- 설명: 룸에 있는 모든 클라이언트에게 채팅 메시지를 전달합니다. 시스템 메시지 전송에도 사용됩니다.
+- 파라미터:
+  - `chatMessage`: `ChatMessage` (Struct)
+
+**`ChatMessage` 구조체:**
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `SenderId` | String | 발신자 ID. "SYSTEM"일 경우 시스템 메시지. |
+| `Message` | String | 메시지 내용 |
+| `Timestamp` | long | 메시지 발신 시각 (Unix Millisecond) |
+| `MessageType` | int | `0`: 로비/대기방, `1`: 인게임 |
+
+**사용 흐름 (Flow)**
+```mermaid
+sequenceDiagram
+    participant C1 as Client 1
+    participant S as Server
+    participant C2 as Client 2
+
+    C1->>S: 1003 CHAT_MESSAGE ("안녕하세요!")
+
+    Note over S: 메시지 수신 후<br/>룸의 모든 클라이언트에게 브로드캐스트
+
+    S->>C1: 2006 CHAT_BROADCAST (chatMessage)
+    S->>C2: 2006 CHAT_BROADCAST (chatMessage)
+
+    Note over S: 시스템 이벤트 발생 시<br/>SenderId="SYSTEM"으로 브로드캐스트
+
+    S->>C1: 2006 CHAT_BROADCAST (SenderId="SYSTEM", Message="게임 시작!")
+    S->>C2: 2006 CHAT_BROADCAST (SenderId="SYSTEM", Message="게임 시작!")
+```
+
+---
+
 #### 6.2.1 클라이언트 → 서버 (Session & Room Management)
 
 **3001 - CONNECT (서버 연결)**
@@ -831,6 +897,11 @@ if (receivedProtocol.Type == 3010) // SUBMIT_COMMAND
 - 방향: 클라이언트 → 서버
 - 파라미터:
   - isReady : bool
+
+**3105 - GET_MAP_LIST (맵 목록 조회)**
+- 방향: 클라이언트 → 서버
+- 설명: 방 생성에 필요한 맵의 전체 목록을 서버에 요청합니다.
+- 파라미터: (없음)
 
 #### 6.2.2 클라이언트 → 서버 (Game Commands)
 
@@ -933,6 +1004,36 @@ public class MoveFleetCommand : Command
 - 파라미터:
   - playerSlot : int
   - isReady : bool
+
+**4210 - MAP_LIST (맵 목록)**
+- 방향: 서버 → 클라이언트
+- 설명: `GET_MAP_LIST` 요청에 대한 응답으로, 현재 사용 가능한 맵의 목록을 반환합니다.
+- 파라미터:
+  - `maps`: String (JSON, `List<MapInfoData>` 객체)
+
+---
+
+**(실시간 룸 목록 업데이트용)**
+
+**4207 - ROOM_CREATED_BROADCAST (방 생성 알림)**
+- 방향: 서버 → 클라이언트 (로비에 있는 모든 클라이언트)
+- 설명: 새로운 방이 생성되었음을 브로드캐스트합니다.
+- 파라미터:
+  - `room`: String (JSON, 생성된 방의 정보 객체)
+
+**4208 - ROOM_UPDATED_BROADCAST (방 상태 변경 알림)**
+- 방향: 서버 → 클라이언트 (로비에 있는 모든 클라이언트)
+- 설명: 방의 상태(플레이어 수, 상태 등)가 변경되었음을 브로드캐스트합니다.
+- 파라미터:
+  - `roomId`: String
+  - `currentPlayers`: int
+  - `status`: String ("waiting", "full", "playing")
+
+**4209 - ROOM_REMOVED_BROADCAST (방 삭제 알림)**
+- 방향: 서버 → 클라이언트 (로비에 있는 모든 클라이언트)
+- 설명: 방이 삭제되었음을 브로드캐스트합니다.
+- 파라미터:
+  - `roomId`: String
 
 #### 6.2.4 서버 → 클라이언트 (Game Events)
 

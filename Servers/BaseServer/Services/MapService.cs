@@ -1,9 +1,11 @@
-﻿using CommonLib.TableData; // MapData, Planet, PlanetType, Vector2
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CommonLib;
+using CommonLib.TableData;
+using BaseServer.Database;
 
-namespace CommonLib.Services
+namespace BaseServer.Services
 {
     /// <summary>
     /// MapService - MapManager 패턴을 따라 구현
@@ -17,12 +19,12 @@ namespace CommonLib.Services
         private readonly object _dataLock = new object();
 
         // DB Repository 참조
-        private GameDBRepository? _gameDbRepository;
+        private BaseServer.Database.GameDBRepository? _gameDbRepository;
 
         /// <summary>
         /// MapService를 초기화합니다.
         /// </summary>
-        public void Initialize(GameDBRepository gameDbRepository)
+        public void Initialize(BaseServer.Database.GameDBRepository gameDbRepository)
         {
             _gameDbRepository = gameDbRepository ?? throw new ArgumentNullException(nameof(gameDbRepository));
         }
@@ -57,43 +59,27 @@ namespace CommonLib.Services
                 return null;
             }
 
-            List<MapInfoData> MapInfo = tableCache.Map_info.Values.ToList();
-            List<PlanetInfoData> PlanetInfo = tableCache.Planet_info.Values.ToList();
-            List<MapPlanetInfoData> MapPlanetInfo = tableCache.Map_Planet_info.Values.ToList();
-            List<MapRouteInfoData> MapRouteInfo = tableCache.Map_Route_info.Values.ToList();
+            // Get all static data from cache
+            List<PlanetInfoData> allPlanetInfos = tableCache.Planet_info.Values.ToList();
 
-            List<Planet> mapPlanets;
-            List<MapRouteInfoData> mapPaths;
-            MapInfoData? mapInfo;
-
+            MapData? newMapData = null;
             lock (_dataLock)
             {
-                // 해당 맵에 속한 행성 정보 필터링
-                var mapPlanetInfos = MapPlanetInfo.Where(c => c.mapId == mapId).ToList();
-                mapPaths = MapRouteInfo.Where(c => c.mapId == mapId).ToList();
-
-                // 행성 객체 생성
-                mapPlanets = new List<Planet>();
-                foreach (var item in mapPlanetInfos)
-                {
-                    var planetInfo = PlanetInfo.Find(c => c.id == item.planetId);
-                    if (planetInfo == null)
-                        continue;
-                    mapPlanets.Add(new Planet(planetInfo, new Vector2(item.PositionX, item.PositionY)));
-                }
-
-                // 맵 기본 정보 가져오기
-                mapInfo = MapInfo.Find(c => c.id == mapId);
-
+                // Find the specific map info
+                tableCache.Map_info.TryGetValue(mapId, out var mapInfo);
                 if (mapInfo == null)
                     return null;
 
-                // MapData 생성 및 캐싱
-                var mapData = new MapData(mapInfo, mapPlanets, mapPaths);
-                m_dic_mapData.Add(mapId, mapData);
+                // Filter layouts and routes for the specific map
+                var mapPlanetLayouts = tableCache.Map_Planet_info.Values.Where(c => c.mapId == mapId).ToList();
+                var mapRoutes = tableCache.Map_Route_info.Values.Where(c => c.mapId == mapId).ToList();
+
+                // Create the new MapData object using the refactored constructor
+                newMapData = new MapData(mapInfo, allPlanetInfos, mapPlanetLayouts, mapRoutes);
+                m_dic_mapData.Add(mapId, newMapData);
             }
 
-            return m_dic_mapData[mapId];
+            return newMapData;
         }
     }
 }

@@ -1,5 +1,5 @@
 using CommonLib;
-using CommonLib.TableData;
+using ChatClientWPF.Models;
 using System;
 using System.Collections.Generic;
 
@@ -15,7 +15,7 @@ namespace ChatClientWPF.Views
         /// <summary>
         /// 맵 데이터를 기반으로 캔버스에 모든 요소를 그립니다.
         /// </summary>
-        void DrawMap(List<Planet> planets, List<(int FromId, int ToId)> connections);
+        void DrawMap(List<DisplayPlanet> planets, List<(int FromId, int ToId)> connections);
 
         /// <summary>
         /// 사용자에게 오류 메시지를 표시합니다.

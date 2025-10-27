@@ -2,6 +2,7 @@ using ChatClientWPF.Controls;
 using ChatClientWPF.Views;
 using CommonLib;
 using CommonLib.TableData;
+using ChatClientWPF.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,7 +39,7 @@ namespace ChatClientWPF.Pages
             InitializeComponent();
         }
 
-        public void DrawMap(List<Planet> planets, List<(int FromId, int ToId)> connections)
+        public void DrawMap(List<DisplayPlanet> planets, List<(int FromId, int ToId)> connections)
         {
             System.Diagnostics.Debug.WriteLine("=== DrawMap 호출됨 ===");
             System.Diagnostics.Debug.WriteLine($"Planets count: {planets?.Count ?? 0}");
@@ -94,7 +95,7 @@ namespace ChatClientWPF.Pages
             int addedCount = 0;
             foreach (var planet in planets)
             {
-                var planetSize = PlanetControl.GetPlanetSize(planet.Type);
+                var planetSize = PlanetControl.GetPlanetSize(PlanetType.Terrestrial); // 임시 타입
 
                 // 좌표 변환: 데이터 범위를 Canvas 범위로 매핑
                 double canvasX = margin + (planet.Position.X - minX) * scale;
@@ -110,16 +111,6 @@ namespace ChatClientWPF.Pages
                 planetControl.OnPlanetMouseLeave += HandlePlanetMouseLeave;
 
                 // Canvas에 추가
-                // PlanetControl은 StackPanel이므로 전체 너비가 행성보다 클 수 있음
-                // 행성 원의 중심이 canvasX, canvasY에 오도록 배치
-                //
-                // PlanetControl 구조:
-                //   StackPanel (HorizontalAlignment=Center)
-                //     ├─ PlanetGrid (행성 원 컨테이너)
-                //     ├─ PlanetNameText
-                //     └─ ResourcePanel
-                //
-                // 행성 원이 중심에 정렬되도록 MinWidth 사용
                 double minWidth = Math.Max(planetSize, 100);
                 Canvas.SetLeft(planetControl, canvasX - minWidth / 2);
                 Canvas.SetTop(planetControl, canvasY - planetSize / 2);
@@ -143,18 +134,12 @@ namespace ChatClientWPF.Pages
                 var planet1Control = _planetControls[conn.FromId];
                 var planet2Control = _planetControls[conn.ToId];
 
-                // PlanetControl의 실제 행성 크기 가져오기
-                var planet1Size = PlanetControl.GetPlanetSize(planet1Control.PlanetData!.Type);
-                var planet2Size = PlanetControl.GetPlanetSize(planet2Control.PlanetData!.Type);
+                var planet1Size = PlanetControl.GetPlanetSize(PlanetType.Terrestrial); // 임시 타입
+                var planet2Size = PlanetControl.GetPlanetSize(PlanetType.Terrestrial); // 임시 타입
 
-                // 연결선 좌표 계산 (행성 중심점)
-                // PlanetControl의 MinWidth를 고려한 중심점 계산
                 double minWidth1 = Math.Max(planet1Size, 100);
                 double minWidth2 = Math.Max(planet2Size, 100);
 
-                // 행성 원의 실제 중심 좌표
-                // Canvas.SetLeft는 MinWidth/2 만큼 왼쪽에 설정되므로,
-                // 행성 중심 = Canvas.GetLeft + MinWidth/2
                 double x1 = Canvas.GetLeft(planet1Control) + minWidth1 / 2;
                 double y1 = Canvas.GetTop(planet1Control) + planet1Size / 2;
                 double x2 = Canvas.GetLeft(planet2Control) + minWidth2 / 2;
@@ -176,10 +161,8 @@ namespace ChatClientWPF.Pages
 
             System.Diagnostics.Debug.WriteLine($"총 {lineCount}개 연결선 추가됨");
 
-            // 자식 요소가 제대로 추가되었는지 디버깅 출력
             System.Diagnostics.Debug.WriteLine($"=== 최종 MapCanvas.Children.Count: {MapCanvas.Children.Count} ===");
 
-            // 강제로 레이아웃 업데이트
             MapCanvas.UpdateLayout();
             MapCanvas.InvalidateVisual();
         }
@@ -194,18 +177,13 @@ namespace ChatClientWPF.Pages
             OnRenderMapClicked?.Invoke();
         }
 
-        /// <summary>
-        /// 행성 클릭 핸들러 (PlanetControl에서 호출)
-        /// </summary>
-        private void HandlePlanetClicked(Planet planet)
+        private void HandlePlanetClicked(DisplayPlanet planet)
         {
-            // 이전에 선택된 행성 선택 해제
             if (_selectedPlanet != null)
             {
                 _selectedPlanet.Deselect();
             }
 
-            // 새로운 행성 선택
             if (_planetControls.ContainsKey(planet.Id))
             {
                 _selectedPlanet = _planetControls[planet.Id];
@@ -216,20 +194,14 @@ namespace ChatClientWPF.Pages
             }
         }
 
-        /// <summary>
-        /// 행성에 마우스 진입 핸들러 (PlanetControl에서 호출)
-        /// </summary>
-        private void HandlePlanetMouseEnter(Planet planet)
+        private void HandlePlanetMouseEnter(DisplayPlanet planet)
         {
             PlanetInfoPanel.Visibility = Visibility.Visible;
-            PlanetInfoText.Text = $"ID: {planet.Id}\nName: {planet.Name}\nType: {planet.Type}\nPosition: ({planet.Position.X}, {planet.Position.Y})";
+            PlanetInfoText.Text = $"ID: {planet.Id}\nName: {planet.Name}\nPosition: ({planet.Position.X}, {planet.Position.Y})";
             Cursor = Cursors.Hand;
         }
 
-        /// <summary>
-        /// 행성에서 마우스 이탈 핸들러 (PlanetControl에서 호출)
-        /// </summary>
-        private void HandlePlanetMouseLeave(Planet planet)
+        private void HandlePlanetMouseLeave(DisplayPlanet planet)
         {
             PlanetInfoPanel.Visibility = Visibility.Collapsed;
             Cursor = Cursors.Arrow;

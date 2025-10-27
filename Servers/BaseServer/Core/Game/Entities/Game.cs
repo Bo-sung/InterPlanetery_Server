@@ -1,7 +1,7 @@
 using BaseServer.Core.Game.Session;
 using BaseServer.Database;
 ﻿using CommonLib.Commands; // IGameCommand
-using CommonLib.Services; // MapService
+using BaseServer.Services; // MapService
 using CommonLib.TableData; // MapData, Planet
 using System;
 using System.Collections.Generic;
@@ -30,7 +30,7 @@ namespace BaseServer.Core.Game.Entities
 
         private Dictionary<long, List<IGameCommand>> m_dic_Commands = new Dictionary<long, List<IGameCommand>>();
         private GameMap _gameMap; // GameMap 객체로 맵 관련 데이터와 로직 위임
-        private MapManager _mapManager;
+        private MapService _mapService;
         private DBManager _dbManager;
 
         protected ClientSession?[] players = new ClientSession[MAX_PLAYERS];
@@ -38,7 +38,7 @@ namespace BaseServer.Core.Game.Entities
         public Game() 
         {
             _dbManager = DBManager.Instance;
-            _mapManager = MapManager.Instance;
+            _mapService = MapService.Instance;
         }
 
         public void EnqueueCommand(IGameCommand command)
@@ -84,7 +84,7 @@ namespace BaseServer.Core.Game.Entities
             // 게임 시작 로직 구현
 
             // 맵 데이터 로드
-            MapData staticMapData = _mapManager.LoadMapData(mapIndex);
+            MapData staticMapData = _mapService.LoadMapData(mapIndex);
             if (staticMapData == null)
             {
                 Console.WriteLine("[Game] Invalid map index.");

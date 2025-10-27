@@ -1,7 +1,27 @@
 #DB DDL 모음
 
-CREATE TABLE `map_planets` (
-  `id` int NOT NULL AUTO_INCREMENT,
+CREATE TABLE `fleet_info` (
+  `id` int NOT NULL,
+  `name` varchar(255) DEFAULT NULL,
+  `type` int NOT NULL,
+  `max_health` int NOT NULL,
+  `attack_power` int NOT NULL,
+  `move_speed` float NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+
+CREATE TABLE `map_info` (
+  `id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` text,
+  `player1_homeworld_id` int NOT NULL,
+  `player2_homeworld_id` int NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+
+CREATE TABLE `map_planet_info` (
+  `id` int NOT NULL,
   `map_id` int NOT NULL,
   `planet_id` int NOT NULL,
   `position_x` float NOT NULL,
@@ -10,62 +30,32 @@ CREATE TABLE `map_planets` (
   UNIQUE KEY `unique_map_planet` (`map_id`,`planet_id`),
   KEY `planet_id` (`planet_id`),
   KEY `idx_map_id` (`map_id`),
-  KEY `idx_position` (`map_id`,`position_x`,`position_y`),
-  CONSTRAINT `map_planets_ibfk_1` FOREIGN KEY (`map_id`) REFERENCES `maps` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `map_planets_ibfk_2` FOREIGN KEY (`planet_id`) REFERENCES `planet_info` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+  KEY `idx_position` (`map_id`,`position_x`,`position_y`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 
-CREATE TABLE `maps` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  `description` text,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `player1_homeworld_id` int NOT NULL,
-  `player2_homeworld_id` int NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-
-CREATE TABLE `planet_info` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  `gas` int NOT NULL,
-  `mineral` int NOT NULL,
-  `supply` int NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-
-CREATE TABLE `planet_routes` (
-  `id` int NOT NULL AUTO_INCREMENT,
+CREATE TABLE `map_route_info` (
+  `id` int NOT NULL,
   `map_id` int NOT NULL,
   `planet_from_id` int NOT NULL,
   `planet_to_id` int NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_route` (`map_id`,`planet_from_id`,`planet_to_id`),
   KEY `planet_from_id` (`planet_from_id`),
   KEY `planet_to_id` (`planet_to_id`),
-  KEY `idx_map_routes` (`map_id`),
-  CONSTRAINT `planet_routes_ibfk_1` FOREIGN KEY (`map_id`) REFERENCES `maps` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `planet_routes_ibfk_2` FOREIGN KEY (`planet_from_id`) REFERENCES `planet_info` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `planet_routes_ibfk_3` FOREIGN KEY (`planet_to_id`) REFERENCES `planet_info` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `planet_routes_chk_1` CHECK ((`planet_from_id` < `planet_to_id`))
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+  KEY `idx_map_routes` (`map_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 
--- 함대 기본 스탯 정보
-CREATE TABLE `fleet_info` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `type_name` varchar(255) NOT NULL,
-  `max_health` int NOT NULL,
-  `attack_power` int NOT NULL,
-  `move_speed` float NOT NULL,
-  `version` varchar(50) DEFAULT NULL,
+CREATE TABLE `planet_info` (
+  `id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `gas` int NOT NULL,
+  `mineral` int NOT NULL,
+  `supply` int NOT NULL,
+  `resource` varchar(100) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 
--- 함대 생산 비용 및 시간 정보
-CREATE TABLE `production_data` (
+CREATE TABLE `production_info` (
   `id` int NOT NULL AUTO_INCREMENT,
   `target_id` int NOT NULL,
   `production_time` float NOT NULL,
@@ -73,4 +63,4 @@ CREATE TABLE `production_data` (
   `gas_cost` int NOT NULL,
   `supply_cost` int NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci

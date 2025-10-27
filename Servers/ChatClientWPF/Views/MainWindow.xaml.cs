@@ -2,7 +2,6 @@ using System.Windows;
 using ChatClientWPF.Pages;
 using ChatClientWPF.Presenters;
 using CommonLib;
-using CommonLib.Services;
 
 namespace ChatClientWPF.Views
 {
@@ -34,9 +33,9 @@ namespace ChatClientWPF.Views
 			var config = CommonLib.AppConfig.Instance;
 			System.Diagnostics.Debug.WriteLine($"AppConfig loaded. DB Server: {config.DatabaseServer}");
 
-			// MapService 초기화 (SingletonBase 패턴 사용)
-			var gameDbRepository = new GameDBRepository();
-			MapService.Instance.Initialize(gameDbRepository);
+			// MapService 초기화 (SingletonBase 패턴 사용) - 클라이언트에서 직접 DB 서비스 초기화 제거
+			// var gameDbRepository = new BaseServer.Database.GameDBRepository();
+			// MapService.Instance.Initialize(gameDbRepository);
 
             // 맵 시각화 페이지 초기화
             var mapPage = new MapDisplayPage();

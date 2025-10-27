@@ -52,7 +52,7 @@ namespace BaseServer.Core.Game.Entities
         protected override void RegisterProtocolHandlers()
         {
             base.RegisterProtocolHandlers();
-            m_protocolHandler.RegisterHandler(ChatProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
         }
 
         public void SetupPlayer(MapData mapData)

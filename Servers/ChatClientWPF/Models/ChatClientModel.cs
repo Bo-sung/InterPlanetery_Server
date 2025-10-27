@@ -90,7 +90,7 @@ namespace ChatClientWPF.Models
 			if (!_isConnected || IsInRoom)
 				return;
 
-			var protocol = new Protocol(ChatProtocolType.JOIN_ROOM)
+			var protocol = new Protocol(CommonLib.ProtocolType.JOIN_ROOM)
 				.AddParam("userId", UserId);
 
 			await SendProtocolAsync(protocol);
@@ -104,7 +104,7 @@ namespace ChatClientWPF.Models
 			if (!_isConnected || !IsInRoom)
 				return;
 
-			var protocol = new Protocol(ChatProtocolType.LEAVE_ROOM)
+			var protocol = new Protocol(CommonLib.ProtocolType.LEAVE_ROOM)
 				.AddParam("userId", UserId);
 
 			await SendProtocolAsync(protocol);
@@ -119,7 +119,7 @@ namespace ChatClientWPF.Models
 				return;
 
 			// 서버와 호환되도록 "message" 파라미터로 전송
-			var protocol = new Protocol(ChatProtocolType.CHAT_MESSAGE)
+			var protocol = new Protocol(CommonLib.ProtocolType.CHAT_MESSAGE)
 				.AddParam("message", message);
 
 			await SendProtocolAsync(protocol);
@@ -133,7 +133,7 @@ namespace ChatClientWPF.Models
 			if (!_isConnected)
 				return;
 
-			var protocol = new Protocol(ChatProtocolType.HEARTBEAT);
+			var protocol = new Protocol(CommonLib.ProtocolType.HEARTBEAT);
 			await SendProtocolAsync(protocol);
 		}
 
@@ -220,7 +220,7 @@ namespace ChatClientWPF.Models
 		{
 			switch (protocol.Type)
 			{
-				case ChatProtocolType.JOIN_SUCCESS:
+				case CommonLib.ProtocolType.JOIN_SUCCESS:
 					{
 						// 서버는 roomInfo 구조체로 전송
 						RoomInfo roomInfo = protocol.GetStruct<RoomInfo>("roomInfo");
@@ -232,14 +232,14 @@ namespace ChatClientWPF.Models
 					}
 					break;
 
-				case ChatProtocolType.JOIN_FAILED:
+				case CommonLib.ProtocolType.JOIN_FAILED:
 					{
 						string reason = protocol.GetParam<string>("reason", "Unknown");
 						OnJoinRoomFailed?.Invoke(reason);
 					}
 					break;
 
-				case ChatProtocolType.LEAVE_SUCCESS:
+				case CommonLib.ProtocolType.LEAVE_SUCCESS:
 					{
 						IsInRoom = false;
 						CurrentRoomId = null;
@@ -247,7 +247,7 @@ namespace ChatClientWPF.Models
 					}
 					break;
 
-				case ChatProtocolType.USER_JOINED:
+				case CommonLib.ProtocolType.USER_JOINED:
 					{
 						string userId = protocol.GetParam<string>("userId", "");
 						int playerCount = protocol.GetParam<int>("playerCount", 0);
@@ -255,7 +255,7 @@ namespace ChatClientWPF.Models
 					}
 					break;
 
-				case ChatProtocolType.USER_LEFT:
+				case CommonLib.ProtocolType.USER_LEFT:
 					{
 						string userId = protocol.GetParam<string>("userId", "");
 						int playerCount = protocol.GetParam<int>("playerCount", 0);
@@ -263,7 +263,7 @@ namespace ChatClientWPF.Models
 					}
 					break;
 
-				case ChatProtocolType.CHAT_BROADCAST:
+				case CommonLib.ProtocolType.CHAT_BROADCAST:
 					{
 						ChatMessage chatMsg = protocol.GetStruct<ChatMessage>("chatMessage");
 						var model = new ChatMessageModel
@@ -277,7 +277,7 @@ namespace ChatClientWPF.Models
 					}
 					break;
 
-				case ChatProtocolType.ROOM_CLOSED:
+				case CommonLib.ProtocolType.ROOM_CLOSED:
 					{
 						string roomId = protocol.GetParam<string>("roomId", "");
 						string reason = protocol.GetParam<string>("reason", "");
@@ -287,14 +287,14 @@ namespace ChatClientWPF.Models
 					}
 					break;
 
-				case ChatProtocolType.ERROR:
+				case CommonLib.ProtocolType.ERROR:
 					{
 						string message = protocol.GetParam<string>("message", "Unknown error");
 						OnError?.Invoke(message);
 					}
 					break;
 
-				case ChatProtocolType.HEARTBEAT_ACK:
+				case CommonLib.ProtocolType.HEARTBEAT_ACK:
 					// 하트비트 응답은 로그만 (필요시 처리)
 					break;
 			}

@@ -52,9 +52,9 @@ namespace BaseServer.Core.Game.Session
         /// </summary>
         protected virtual void RegisterProtocolHandlers()
         {
-            m_protocolHandler.RegisterHandler(ChatProtocolType.CHAT_MESSAGE, HandleChatMessage);
-            m_protocolHandler.RegisterHandler(ChatProtocolType.LEAVE_ROOM, HandleLeaveRoom);
-            m_protocolHandler.RegisterHandler(ChatProtocolType.HEARTBEAT, HandleHeartbeat);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.CHAT_MESSAGE, HandleChatMessage);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.LEAVE_ROOM, HandleLeaveRoom);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.HEARTBEAT, HandleHeartbeat);
         }
 
         /// <summary>
@@ -248,7 +248,7 @@ namespace BaseServer.Core.Game.Session
             UpdateLastActivity();
 
             // 하트비트 응답 전송
-            Protocol ackProtocol = new Protocol(ChatProtocolType.HEARTBEAT_ACK)
+            Protocol ackProtocol = new Protocol(CommonLib.ProtocolType.HEARTBEAT_ACK)
                 .AddParam("serverTime", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
             await SendAsync(ackProtocol.Serialize());
@@ -293,7 +293,7 @@ namespace BaseServer.Core.Game.Session
                 CurrentRoom.RemovePlayer(this);
 
                 // 퇴장 성공 메시지 전송
-                Protocol leaveSuccessProtocol = new Protocol(ChatProtocolType.LEAVE_SUCCESS)
+                Protocol leaveSuccessProtocol = new Protocol(CommonLib.ProtocolType.LEAVE_SUCCESS)
                     .AddParam("message", "You have left the room");
 
                 await SendAsync(leaveSuccessProtocol.Serialize());
@@ -315,7 +315,7 @@ namespace BaseServer.Core.Game.Session
                 MaxPlayers = _room.MaxPlayers
             };
 
-            Protocol protocol = new Protocol(ChatProtocolType.JOIN_SUCCESS)
+            Protocol protocol = new Protocol(CommonLib.ProtocolType.JOIN_SUCCESS)
                 .AddParam("sessionId", SessionId)
                 .AddStruct("roomInfo", roomInfo)
                 .AddParam("message", $"Welcome to {_room.RoomId}! Type '-1' to leave.");
@@ -328,7 +328,7 @@ namespace BaseServer.Core.Game.Session
         /// </summary>
         private async Task SendErrorAsync(string _errorMessage)
         {
-            Protocol protocol = new Protocol(ChatProtocolType.ERROR)
+            Protocol protocol = new Protocol(CommonLib.ProtocolType.ERROR)
                 .AddParam("message", _errorMessage);
 
             await SendAsync(protocol.Serialize());
