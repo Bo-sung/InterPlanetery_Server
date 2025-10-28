@@ -123,40 +123,140 @@
                 </StackPanel>
             </Border>
 
-            <!-- Server 설정 섹션 -->
+            <!-- Game Server 설정 섹션 -->
             <Border Grid.Row="4" Style="{StaticResource SectionBorderStyle}">
                 <StackPanel>
                     <!-- 섹션 헤더 -->
-                    <TextBlock Text="Server Configuration"
-                               Style="{StaticResource SectionHeaderStyle}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <TextBlock Text="Game Server Configuration"
+                                   Style="{StaticResource SectionHeaderStyle}"/>
+                        <Button x:Name="AddServerButton"
+                                Content="+ Add Server"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                HorizontalAlignment="Right"
+                                Margin="0,0,0,0"
+                                Width="Auto"
+                                Padding="15,8"
+                                Click="AddServerButton_Click"/>
+                    </StackPanel>
 
-                    <!-- Host -->
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="Host:"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBox Grid.Column="1"
-                                 x:Name="ServerHostTextBox"
-                                 Style="{StaticResource TextBoxStyle}"/>
-                    </Grid>
+                    <!-- 게임 서버 목록 -->
+                    <ScrollViewer MaxHeight="250" VerticalScrollBarVisibility="Auto" Margin="0,0,0,15">
+                        <ItemsControl x:Name="GameServersItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource BackgroundBrush}"
+                                            BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="3"
+                                            Padding="15"
+                                            Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
 
-                    <!-- Port -->
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="Port:"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBox Grid.Column="1"
-                                 x:Name="ServerPortTextBox"
-                                 Style="{StaticResource TextBoxStyle}"/>
-                    </Grid>
+                                            <!-- 서버 정보 -->
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding Name}"
+                                                          FontSize="14"
+                                                          FontWeight="Bold"
+                                                          Foreground="{StaticResource PrimaryBrush}"
+                                                          Margin="0,0,0,5"/>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="Host: " Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                    <TextBlock Text="{Binding Host}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                    <TextBlock Text="  |  Port: " Foreground="{StaticResource TextSecondaryBrush}" Margin="10,0,0,0"/>
+                                                    <TextBlock Text="{Binding Port}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- 삭제 버튼 -->
+                                            <Button Grid.Column="1"
+                                                    Content="Delete"
+                                                    Style="{StaticResource DangerButtonStyle}"
+                                                    Padding="12,8"
+                                                    VerticalAlignment="Center"
+                                                    Click="DeleteServerButton_Click"
+                                                    Tag="{Binding Name}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- 새 서버 추가 폼 (숨김) -->
+                    <Border x:Name="AddServerFormBorder"
+                            Background="{StaticResource BackgroundBrush}"
+                            BorderBrush="{StaticResource PrimaryBrush}"
+                            BorderThickness="2"
+                            CornerRadius="3"
+                            Padding="15"
+                            Margin="0,10,0,0"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Add New Game Server"
+                                      Style="{StaticResource SectionHeaderStyle}"
+                                      Margin="0,0,0,15"/>
+
+                            <!-- Server Name -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                          Text="Server Name:"
+                                          Style="{StaticResource LabelStyle}"/>
+                                <TextBox Grid.Column="1"
+                                        x:Name="NewServerNameTextBox"
+                                        Style="{StaticResource TextBoxStyle}"/>
+                            </Grid>
+
+                            <!-- Server Host -->
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                          Text="Host:"
+                                          Style="{StaticResource LabelStyle}"/>
+                                <TextBox Grid.Column="1"
+                                        x:Name="NewServerHostTextBox"
+                                        Style="{StaticResource TextBoxStyle}"/>
+                            </Grid>
+
+                            <!-- Server Port -->
+                            <Grid Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                          Text="Port:"
+                                          Style="{StaticResource LabelStyle}"/>
+                                <TextBox Grid.Column="1"
+                                        x:Name="NewServerPortTextBox"
+                                        Style="{StaticResource TextBoxStyle}"/>
+                            </Grid>
+
+                            <!-- 버튼 -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="Cancel"
+                                       Style="{StaticResource SecondaryButtonStyle}"
+                                       Padding="15,8"
+                                       Margin="0,0,10,0"
+                                       Click="CancelAddServerButton_Click"/>
+                                <Button Content="Add Server"
+                                       Style="{StaticResource PrimaryButtonStyle}"
+                                       Padding="15,8"
+                                       Click="ConfirmAddServerButton_Click"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 

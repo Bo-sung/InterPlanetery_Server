@@ -1,0 +1,445 @@
+<Page x:Class="ChatClientWPF.Pages.GameRoomPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      mc:Ignorable="d"
+      Title="Game Room"
+      Background="#1a1f3a"
+      Loaded="Page_Loaded">
+
+    <Page.Resources>
+        <!-- Color Resources -->
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#1a1f3a"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#2a3050"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#3d5a80"/>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#98c1d9"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#e0e0e0"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="#aaa"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="#2a9d8f"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#e74c3c"/>
+        <SolidColorBrush x:Key="PrimaryActionBrush" Color="#4a90e2"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#ffb703"/>
+
+        <!-- Button Styles -->
+        <Style x:Key="BaseButtonStyle" TargetType="Button">
+            <Setter Property="Padding" Value="10,10"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="500"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="PrimaryButtonStyle" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryActionBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PrimaryActionBrush}"/>
+        </Style>
+
+        <Style x:Key="SuccessButtonStyle" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}"/>
+        </Style>
+
+        <Style x:Key="DangerButtonStyle" BasedOn="{StaticResource BaseButtonStyle}" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+        </Style>
+
+        <!-- TextBox Style -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#1a1f3a"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <!-- ComboBox Style -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#1a1f3a"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <!-- CheckBox Style -->
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+
+        <!-- Panel Style -->
+        <Style x:Key="PanelStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="20"/>
+        </Style>
+
+        <Style x:Key="PanelTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+            <Setter Property="Padding" Value="0,0,0,10"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ==================== 상단: 서버 연결 설정 ==================== -->
+        <Border Grid.Row="0" Style="{StaticResource PanelStyle}" Margin="20,20,20,0">
+            <StackPanel>
+                <TextBlock Text="서버 연결 설정" Style="{StaticResource PanelTitleStyle}"/>
+
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="100"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 게임 서버 선택 -->
+                    <TextBlock Grid.Column="0" Text="게임 서버:" Foreground="{StaticResource PrimaryBrush}"
+                              VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="500"/>
+                    <ComboBox Grid.Column="1"
+                             ItemsSource="{Binding GameServers}"
+                             SelectedItem="{Binding SelectedGameServer}"
+                             DisplayMemberPath="Name"
+                             Margin="0,0,10,0"/>
+
+                    <!-- 포트 (읽기 전용) -->
+                    <TextBlock Grid.Column="2" Text="포트:" Foreground="{StaticResource PrimaryBrush}"
+                              VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="500"/>
+                    <TextBlock Grid.Column="3" Text="{Binding ServerPort}"
+                              Foreground="{StaticResource TextBrush}"
+                              VerticalAlignment="Center" Margin="0,0,10,0"
+                              Padding="10"/>
+
+                    <!-- 플레이어 이름 -->
+                    <TextBlock Grid.Column="4" Text="플레이어명:" Foreground="{StaticResource PrimaryBrush}"
+                              VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="500"/>
+                    <TextBox Grid.Column="5" Text="{Binding PlayerName, UpdateSourceTrigger=PropertyChanged}"
+                            Margin="0,0,10,0"/>
+
+                    <!-- 연결 상태 -->
+                    <StackPanel Grid.Column="6" Orientation="Horizontal">
+                        <Button Content="연결" Style="{StaticResource SuccessButtonStyle}"
+                               Command="{Binding ConnectCommand}" Padding="20,10" Width="80" Margin="0,0,10,0"/>
+                        <Button Content="해제" Style="{StaticResource DangerButtonStyle}"
+                               Command="{Binding DisconnectCommand}" Padding="20,10" Width="80" Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding ConnectionStatus}" Foreground="{StaticResource PrimaryBrush}"
+                                  VerticalAlignment="Center" FontWeight="Bold" MinWidth="120"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ==================== 하단: 게임 로비 / 대기방 ==================== -->
+        <Grid Grid.Row="1" Margin="20,20,20,20">
+            <!-- 로비 화면 -->
+            <Grid x:Name="LobbyGrid" Visibility="Visible">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="350"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 왼쪽: 방 목록 -->
+                <Border Grid.Column="0" Style="{StaticResource PanelStyle}" Margin="0,0,10,0">
+                    <StackPanel>
+                        <!-- 헤더 -->
+                        <Grid Margin="0,0,0,15">
+                            <TextBlock Text="게임 방 목록" Style="{StaticResource PanelTitleStyle}"/>
+                            <Button Content="새로고침" Style="{StaticResource BaseButtonStyle}"
+                                   Command="{Binding RefreshRoomListCommand}" HorizontalAlignment="Right"/>
+                        </Grid>
+
+                        <!-- 필터 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                            <TextBlock Text="상태:" Foreground="{StaticResource PrimaryBrush}"
+                                      VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <ComboBox Width="120" VerticalAlignment="Center">
+                                <ComboBoxItem Content="전체" IsSelected="True"/>
+                                <ComboBoxItem Content="대기중"/>
+                                <ComboBoxItem Content="게임중"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- 방 목록 -->
+                        <ScrollViewer MaxHeight="350" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding RoomList}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#1a1f3a" BorderBrush="{StaticResource BorderBrush}"
+                                               BorderThickness="1" Padding="15" Margin="0,0,0,10"
+                                               MouseLeftButtonUp="RoomCard_MouseLeftButtonUp">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- 방 정보 -->
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="{Binding RoomName}" FontSize="16"
+                                                              FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                        <TextBlock Text="{Binding PlayerCountText}" FontSize="13"
+                                                                  Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,15,0"/>
+                                                        <TextBlock Text="{Binding MapName}" FontSize="13"
+                                                                  Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <!-- 상태 및 버튼 -->
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Border Padding="12,4" Background="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
+                                                           Margin="0,0,10,0">
+                                                        <TextBlock Text="{Binding Status}" Foreground="White" FontSize="12"
+                                                                  FontWeight="Bold" TextAlignment="Center"/>
+                                                    </Border>
+                                                    <Button Content="입장" Style="{StaticResource PrimaryButtonStyle}"
+                                                           Padding="20,8" Click="JoinRoom_Click" Tag="{Binding RoomId}"
+                                                           IsEnabled="{Binding CanJoin}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <!-- 오른쪽: 방 만들기 -->
+                <Border Grid.Column="1" Style="{StaticResource PanelStyle}" Margin="10,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="새 방 만들기" Style="{StaticResource PanelTitleStyle}"/>
+
+                        <!-- 방 이름 -->
+                        <TextBlock Text="방 이름" Foreground="{StaticResource PrimaryBrush}"
+                                  FontWeight="500" Margin="0,0,0,8"/>
+                        <TextBox Text="{Binding NewRoomName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,15"/>
+
+                        <!-- 맵 선택 -->
+                        <TextBlock Text="맵 선택" Foreground="{StaticResource PrimaryBrush}"
+                                  FontWeight="500" Margin="0,0,0,8"/>
+                        <ComboBox ItemsSource="{Binding MapList}" SelectedValuePath="MapId"
+                                 DisplayMemberPath="MapName" SelectedValue="{Binding SelectedMapId}" Margin="0,0,0,15"/>
+
+                        <!-- 비공개 방 체크박스 -->
+                        <CheckBox Content="비공개 방" IsChecked="{Binding IsPrivateRoom}" Margin="0,0,0,15"/>
+
+                        <!-- 방 만들기 버튼 -->
+                        <Button Content="방 만들기" Style="{StaticResource SuccessButtonStyle}"
+                               Command="{Binding CreateRoomCommand}" Padding="0,10"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 대기방 화면 -->
+            <Grid x:Name="WaitingRoomGrid" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="400"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="1*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 상단 헤더 -->
+                <Border Grid.ColumnSpan="2" Style="{StaticResource PanelStyle}" Margin="0,0,0,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 좌측: 돌아가기 & 방 정보 -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="← 로비로 돌아가기" Style="{StaticResource BaseButtonStyle}"
+                                   Command="{Binding LeaveRoomCommand}" Margin="0,0,20,0"/>
+                            <TextBlock Text="{Binding CurrentRoom.RoomName}" FontSize="24"
+                                      FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"
+                                      VerticalAlignment="Center" Margin="0,0,20,0"/>
+                            <Border Background="{StaticResource SuccessBrush}" Padding="12,6">
+                                <TextBlock Text="{Binding CurrentRoom.MapName, StringFormat='맵: {0}'}"
+                                          Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 우측: 준비 완료 버튼 -->
+                        <Button Grid.Column="1" Content="{Binding ReadyButtonText}"
+                               Style="{StaticResource SuccessButtonStyle}"
+                               Command="{Binding ReadyCommand}" Padding="20,10" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 왼쪽: 플레이어 슬롯 & 게임 설정 -->
+                <StackPanel Grid.Column="0" Grid.Row="1" Margin="0,0,10,0">
+                    <!-- 플레이어 슬롯 -->
+                    <Border Style="{StaticResource PanelStyle}" Margin="0,0,0,20">
+                        <StackPanel>
+                            <TextBlock Text="{Binding PlayerSlots.Count, StringFormat='플레이어 ({0}/2)'}"
+                                      Style="{StaticResource PanelTitleStyle}"/>
+                            <ItemsControl ItemsSource="{Binding PlayerSlots}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#1a1f3a" BorderBrush="{StaticResource BorderBrush}"
+                                               BorderThickness="2" Padding="20" Margin="0,0,0,15">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="60"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- 아바타 -->
+                                                <Ellipse Grid.Column="0" Width="60" Height="60" Margin="0,0,15,0">
+                                                    <Ellipse.Fill>
+                                                        <SolidColorBrush Color="{Binding IsOccupied, Converter={StaticResource BoolToColorConverter}}"/>
+                                                    </Ellipse.Fill>
+                                                </Ellipse>
+
+                                                <!-- 플레이어 정보 -->
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding PlayerName, FallbackValue='플레이어 대기중...'}"
+                                                              FontSize="18" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                        <TextBlock Text="{Binding IsHost, StringFormat='방장 • ', FallbackValue=''}"
+                                                                  Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"/>
+                                                        <TextBlock Text="{Binding SlotNumber, StringFormat='플레이어 {0}'}"
+                                                                  Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <!-- 준비 상태 -->
+                                                <Border Grid.Column="2" Background="{Binding IsReady, Converter={StaticResource BoolToBrushConverter}}"
+                                                       Padding="16,8" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding IsReady}"
+                                                              Foreground="White" FontSize="14" FontWeight="Bold"/>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 게임 설정 -->
+                    <Border Style="{StaticResource PanelStyle}">
+                        <StackPanel>
+                            <TextBlock Text="게임 설정" Style="{StaticResource PanelTitleStyle}"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="맵" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GameSettings.MapName}"
+                                          Foreground="{StaticResource TextBrush}" FontWeight="Bold"/>
+                            </Grid>
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Margin="0,0,0,10"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="최대 플레이어" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Grid.Column="1" Foreground="{StaticResource TextBrush}" FontWeight="Bold">
+                                    <Run Text="{Binding GameSettings.MaxPlayerCount}"/>명
+                                </TextBlock>
+                            </Grid>
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Margin="0,0,0,10"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="시작 자원" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GameSettings.StartingResources}"
+                                          Foreground="{StaticResource TextBrush}" FontWeight="Bold"/>
+                            </Grid>
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Margin="0,0,0,10"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="방 유형" Foreground="{StaticResource PrimaryBrush}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding GameSettings.RoomType}"
+                                          Foreground="{StaticResource TextBrush}" FontWeight="Bold"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 오른쪽: 채팅 -->
+                <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource PanelStyle}" Margin="10,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="채팅" Style="{StaticResource PanelTitleStyle}"/>
+
+                        <!-- 채팅 메시지 -->
+                        <ScrollViewer MaxHeight="350" VerticalScrollBarVisibility="Auto" Margin="0,0,0,15">
+                            <ItemsControl ItemsSource="{Binding ChatMessages}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,10">
+                                            <!-- 시스템 메시지 -->
+                                            <TextBlock Visibility="{Binding IsSystemMessage, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                      Text="{Binding Message}" Foreground="{StaticResource SuccessBrush}"
+                                                      FontStyle="Italic" FontSize="13" TextWrapping="Wrap"/>
+
+                                            <!-- 일반 메시지 -->
+                                            <StackPanel Visibility="{Binding IsSystemMessage, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                                    <TextBlock Text="{Binding SenderId}" Foreground="{StaticResource PrimaryActionBrush}"
+                                                              FontSize="13" FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding FormattedTime}" Foreground="{StaticResource TextSecondaryBrush}"
+                                                              FontSize="11" Margin="10,0,0,0"/>
+                                                </StackPanel>
+                                                <Border Background="#2a3050" BorderBrush="{StaticResource PrimaryActionBrush}"
+                                                       BorderThickness="3,0,0,0" Padding="12,8">
+                                                    <TextBlock Text="{Binding Message}" Foreground="{StaticResource TextBrush}"
+                                                              FontSize="14" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- 채팅 입력 -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox Text="{Binding ChatInput, UpdateSourceTrigger=PropertyChanged}"
+                                    AcceptsReturn="False" Margin="0,0,10,0"/>
+                            <Button Content="전송" Style="{StaticResource PrimaryButtonStyle}"
+                                   Command="{Binding SendChatCommand}" Width="60"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

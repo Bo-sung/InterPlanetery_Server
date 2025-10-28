@@ -56,6 +56,12 @@ namespace ChatClientWPF.Pages
                 return;
             }
 
+            // 로딩 패널 숨기기
+            if (LoadingPanel != null)
+            {
+                LoadingPanel.Visibility = Visibility.Collapsed;
+            }
+
             MapCanvas.Children.Clear();
             _planetControls.Clear();
             _selectedPlanet = null;
@@ -169,11 +175,26 @@ namespace ChatClientWPF.Pages
 
         public void ShowError(string message)
         {
+            // 로딩 패널 숨기기
+            if (LoadingPanel != null && Dispatcher.CheckAccess())
+            {
+                LoadingPanel.Visibility = Visibility.Collapsed;
+            }
+            else if (LoadingPanel != null)
+            {
+                Dispatcher.Invoke(() => LoadingPanel.Visibility = Visibility.Collapsed);
+            }
+
             MessageBox.Show(message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         private void RenderMapButton_Click(object sender, RoutedEventArgs e)
         {
+            // 로딩 패널 표시
+            if (LoadingPanel != null)
+            {
+                LoadingPanel.Visibility = Visibility.Visible;
+            }
             OnRenderMapClicked?.Invoke();
         }
 

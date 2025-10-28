@@ -34,6 +34,7 @@ namespace ChatClientWPF.Models
 		public event Action<string, string>? OnRoomClosed;
 		public event Action<string>? OnError;
 		public event Action? OnDisconnected;
+		public event Action<List<RoomListItem>>? OnRoomListReceived;
 
 		/// <summary>
 		/// 서버에 연결
@@ -80,6 +81,18 @@ namespace ChatClientWPF.Models
 
 			OnDisconnected?.Invoke();
 			OnConnectionChanged?.Invoke(false, "Disconnected");
+		}
+
+		/// <summary>
+		/// 룸 목록 조회 요청
+		/// </summary>
+		public async Task GetRoomListAsync()
+		{
+			if (!_isConnected)
+				return;
+
+			var protocol = new Protocol(CommonLib.ProtocolType.GET_ROOM_LIST);
+			await SendProtocolAsync(protocol);
 		}
 
 		/// <summary>
@@ -284,6 +297,20 @@ namespace ChatClientWPF.Models
 						IsInRoom = false;
 						CurrentRoomId = null;
 						OnRoomClosed?.Invoke(roomId, reason);
+					}
+					break;
+
+				case CommonLib.ProtocolType.ROOM_LIST:
+					{
+						try
+						{
+							var roomList = protocol.GetParam<List<RoomListItem>>("roomList", new List<RoomListItem>());
+							OnRoomListReceived?.Invoke(roomList);
+						}
+						catch (Exception ex)
+						{
+							OnError?.Invoke($"Failed to parse room list: {ex.Message}");
+						}
 					}
 					break;
 

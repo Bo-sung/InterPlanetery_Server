@@ -2,7 +2,9 @@ using ChatClientWPF.Views;
 using CommonLib;
 using MySql.Data.MySqlClient;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace ChatClientWPF.Presenters
 {
@@ -44,8 +46,12 @@ namespace ChatClientWPF.Presenters
                 _view.DatabasePassword = config.DatabasePassword;
                 _view.DatabaseName = config.DatabaseName;
                 _view.DatabasePort = config.DatabasePort;
-                _view.ServerHost = config.ServerHost;
-                _view.ServerPort = config.ServerPort;
+
+                // GameServers 로드
+                if (_view is ChatClientWPF.Pages.SettingsPage settingsPage)
+                {
+                    settingsPage.LoadGameServers();
+                }
 
                 // 연결 문자열 미리보기 업데이트
                 UpdateConnectionStringPreview();
@@ -68,6 +74,13 @@ namespace ChatClientWPF.Presenters
             {
                 Debug.WriteLine("=== HandleSaveClicked 호출됨 ===");
 
+                // GameServers 가져오기
+                var gameServers = new List<AppConfig.GameServerConfig>();
+                if (_view is ChatClientWPF.Pages.SettingsPage settingsPage)
+                {
+                    gameServers = settingsPage.GetGameServers().ToList();
+                }
+
                 // View에서 설정값 가져오기
                 var config = new AppConfig.ConfigData
                 {
@@ -79,11 +92,7 @@ namespace ChatClientWPF.Presenters
                         DatabaseName = _view.DatabaseName,
                         Port = _view.DatabasePort
                     },
-                    Server = new AppConfig.ServerConfig
-                    {
-                        Host = _view.ServerHost,
-                        Port = _view.ServerPort
-                    },
+                    GameServers = gameServers,
                     Logging = new AppConfig.LoggingConfig
                     {
                         LogLevel = "Debug"

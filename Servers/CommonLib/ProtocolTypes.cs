@@ -10,6 +10,10 @@
 		public const int LEAVE_ROOM = 1002;         // 룸 퇴장 요청
 		public const int CHAT_MESSAGE = 1003;       // 채팅 메시지 전송
 		public const int HEARTBEAT = 1004;          // 하트비트 (연결 유지 확인)
+		public const int CREATE_ROOM = 3100;        // 방 생성 요청
+		public const int JOIN_ROOM_REQUEST = 3101;  // 방 입장 요청 (상세)
+		public const int GET_ROOM_LIST = 3103;      // 룸 목록 조회 요청
+		public const int READY = 3104;              // 게임 준비 완료
         public const int GET_MAP_LIST = 3105;       // 맵 목록 조회 요청
         public const int GET_TABLE_DATA = 3106;     // 테이블 데이터 조회 요청
 
@@ -23,6 +27,11 @@
 		public const int ROOM_CLOSED = 2007;        // 룸 종료 알림
 		public const int HEARTBEAT_ACK = 2008;      // 하트비트 응답
 		public const int ERROR = 2999;              // 에러 메시지
+		public const int ROOM_JOINED = 4201;        // 방 입장 완료 알림
+		public const int PLAYER_JOINED_ROOM = 4203; // 플레이어 방 입장 알림
+		public const int PLAYER_LEFT_ROOM = 4204;   // 플레이어 방 퇴장 알림
+		public const int ROOM_LIST = 4205;          // 룸 목록 응답
+		public const int PLAYER_READY_STATE = 4206; // 플레이어 준비 상태 알림
         public const int MAP_LIST = 4210;           // 맵 목록 응답
         public const int TABLE_DATA = 4211;         // 테이블 데이터 응답
 

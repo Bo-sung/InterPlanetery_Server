@@ -59,6 +59,15 @@
                 </Frame>
             </TabItem>
 
+            <!-- Game Room 탭 -->
+            <TabItem Header="Game Room">
+                <Frame x:Name="GameRoomFrame" NavigationUIVisibility="Hidden">
+                    <Frame.Content>
+                        <pages:GameRoomPage/>
+                    </Frame.Content>
+                </Frame>
+            </TabItem>
+
             <!-- Galaxy Map 탭 -->
             <TabItem Header="Galaxy Map">
                 <Frame x:Name="MapFrame" NavigationUIVisibility="Hidden" />

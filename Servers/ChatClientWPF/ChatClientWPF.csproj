@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CommonLib\CommonLib.csproj" />
+    <ProjectReference Include="..\BaseServer\BaseServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

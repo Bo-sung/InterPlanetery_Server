@@ -33,16 +33,6 @@ namespace ChatClientWPF.Views
         int DatabasePort { get; set; }
 
         /// <summary>
-        /// 서버 호스트
-        /// </summary>
-        string ServerHost { get; set; }
-
-        /// <summary>
-        /// 서버 포트
-        /// </summary>
-        int ServerPort { get; set; }
-
-        /// <summary>
         /// 연결 문자열 미리보기 업데이트
         /// </summary>
         void UpdateConnectionStringPreview(string connectionString);

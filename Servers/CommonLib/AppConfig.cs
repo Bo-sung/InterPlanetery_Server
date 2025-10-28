@@ -104,26 +104,14 @@ namespace CommonLib
         }
 
         /// <summary>
-        /// 서버 포트 번호
+        /// 게임 서버 목록
         /// </summary>
-        public int ServerPort
+        public List<GameServerConfig> GameServers
         {
             get
             {
                 EnsureConfigLoaded();
-                return _config?.Server?.Port ?? 7777;
-            }
-        }
-
-        /// <summary>
-        /// 서버 호스트 주소
-        /// </summary>
-        public string ServerHost
-        {
-            get
-            {
-                EnsureConfigLoaded();
-                return _config?.Server?.Host ?? "localhost";
+                return _config?.GameServers ?? new List<GameServerConfig>();
             }
         }
 
@@ -161,7 +149,7 @@ namespace CommonLib
         }
 
         /// <summary>
-        /// 설정 파일을 로드합니다.
+        /// 설정 파일을 로드합니다. 파일이 없으면 자동으로 생성합니다.
         /// </summary>
         public void LoadConfig()
         {
@@ -176,10 +164,12 @@ namespace CommonLib
 
                     if (!File.Exists(configPath))
                     {
-                        System.Diagnostics.Debug.WriteLine($"[WARNING] appsettings.json not found at: {configPath}");
-                        System.Diagnostics.Debug.WriteLine("[WARNING] Using default configuration values");
-                        Console.WriteLine($"[WARNING] appsettings.json not found at: {configPath}");
+                        System.Diagnostics.Debug.WriteLine($"[INFO] appsettings.json not found at: {configPath}");
+                        System.Diagnostics.Debug.WriteLine("[INFO] Creating default configuration file...");
+                        Console.WriteLine($"[INFO] Creating appsettings.json at: {configPath}");
+
                         _config = GetDefaultConfig();
+                        CreateDefaultConfigFile(configPath);
                         LogCurrentConfig();
                         return;
                     }
@@ -353,16 +343,68 @@ namespace CommonLib
                     DatabaseName = "interplanetery_tabledb_local",
                     Port = 3306
                 },
-                Server = new ServerConfig
+                GameServers = new List<GameServerConfig>
                 {
-                    Host = "localhost",
-                    Port = 7777
+                    new GameServerConfig
+                    {
+                        Name = "로컬 서버",
+                        Host = "127.0.0.1",
+                        Port = 5000
+                    },
+                    new GameServerConfig
+                    {
+                        Name = "개발 서버",
+                        Host = "192.168.1.100",
+                        Port = 5000
+                    },
+                    new GameServerConfig
+                    {
+                        Name = "라이브 서버",
+                        Host = "game.example.com",
+                        Port = 5000
+                    }
                 },
                 Logging = new LoggingConfig
                 {
                     LogLevel = "Information"
                 }
             };
+        }
+
+        /// <summary>
+        /// 기본 설정 파일을 생성합니다.
+        /// </summary>
+        private void CreateDefaultConfigFile(string configPath)
+        {
+            try
+            {
+                // 디렉토리가 없으면 생성
+                string directory = Path.GetDirectoryName(configPath);
+                if (!Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                // JSON으로 직렬화
+                string json = JsonSerializer.Serialize(_config, new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
+                // 파일에 저장
+                File.WriteAllText(configPath, json);
+
+                System.Diagnostics.Debug.WriteLine($"[INFO] Default configuration file created successfully: {configPath}");
+                Console.WriteLine($"[INFO] Default configuration file created at: {configPath}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Failed to create default config file: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
+                Console.WriteLine($"[ERROR] Failed to create config file: {ex.Message}");
+                // 파일 생성 실패해도 계속 진행 (메모리 설정은 로드됨)
+            }
         }
 
         /// <summary>
@@ -378,7 +420,7 @@ namespace CommonLib
         public class ConfigData
         {
             public DatabaseConfig? Database { get; set; }
-            public ServerConfig? Server { get; set; }
+            public List<GameServerConfig>? GameServers { get; set; }
             public LoggingConfig? Logging { get; set; }
         }
 
@@ -415,10 +457,22 @@ namespace CommonLib
             public string? ConnectionString { get; set; }
         }
 
-        public class ServerConfig
+        public class GameServerConfig
         {
-            public string Host { get; set; } = "localhost";
-            public int Port { get; set; } = 7777;
+            /// <summary>
+            /// 서버 이름 (표시용)
+            /// </summary>
+            public string Name { get; set; } = string.Empty;
+
+            /// <summary>
+            /// 서버 호스트 주소
+            /// </summary>
+            public string Host { get; set; } = string.Empty;
+
+            /// <summary>
+            /// 서버 포트
+            /// </summary>
+            public int Port { get; set; } = 5000;
         }
 
         public class LoggingConfig

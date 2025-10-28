@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:converters="clr-namespace:ChatClientWPF.Converters">
 
     <!-- Color Palette (VS Code Dark Theme) -->
     <SolidColorBrush x:Key="BackgroundBrush" Color="#FF1E1E1E"/>
@@ -234,5 +235,12 @@
         <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
     </Style>
+
+    <!-- Converters -->
+    <converters:StatusToBrushConverter x:Key="StatusToBrushConverter"/>
+    <converters:BoolToColorConverter x:Key="BoolToColorConverter"/>
+    <converters:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+    <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
 
 </ResourceDictionary>
