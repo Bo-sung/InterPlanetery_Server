@@ -5,14 +5,18 @@ using System.Data;
 using System.Net.Sockets;
 using System.Windows.Input;
 using BaseServer.Core.Game.Session;
+using ProtocolType = CommonLib.ProtocolType;
 
 namespace BaseServer.Core.Game.Entities
 {
     /// <summary>
-    /// 게임 플레이어 객체
+    /// 게임 플레이어 객체. 클라이언트 세션을 래핑하여 사용.
+    /// 대충 GamePlayer 라는 메카에 ClientSession이 탑승한 상태라 보면 됨.
     /// </summary>
-    public class GamePlayer : ClientSession
+    public class GamePlayer
     {
+        private ClientSession clientSession;
+        public ClientSession Session => clientSession;
         private int m_id = 0;
         private string m_name = "";
 
@@ -27,8 +31,6 @@ namespace BaseServer.Core.Game.Entities
         private int m_faction = 0; // 진영 정보
         private int m_homeworld = 0; // 본진 행성 ID
         private bool m_isDefeated = false;
-
-        private MapData m_mapData;
 
         public int ID { get { return m_id; } set { m_id = value; } }
         public string Name { get { return m_name; } set { m_name = value; } }
@@ -45,19 +47,15 @@ namespace BaseServer.Core.Game.Entities
         public List<int> Planets { get { return m_planets; } }
         public Queue<int> ProductionOrder { get { return m_productionOrder; } }
 
-        public GamePlayer(TcpClient _client) : base(_client)
+        public GamePlayer(ClientSession clientSession)
         {
+            this.clientSession = clientSession;
+            RegistorProtos();
         }
 
-        protected override void RegisterProtocolHandlers()
+        private void RegistorProtos()
         {
-            base.RegisterProtocolHandlers();
-            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
-        }
-
-        public void SetupPlayer(MapData mapData)
-        {
-            m_mapData = mapData;
+            clientSession.RegisterProto(ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
         }
 
         /// <summary>
@@ -80,10 +78,6 @@ namespace BaseServer.Core.Game.Entities
                 return;
             }
 
-            UpdateLastActivity(); // 활동 갱신
-
-            Console.WriteLine($"[Session {SessionId}] Command: {commandType}");
-
             IGameCommand command;
             switch (commandType)
             {
@@ -97,9 +91,9 @@ namespace BaseServer.Core.Game.Entities
                     return;
             }
 
-            if (CurrentRoom != null)
+            if (clientSession.CurrentRoom != null)
             {
-                await CurrentRoom.AddCommand(command);
+                await clientSession.CurrentRoom.AddCommand(command);
             }
         }
 

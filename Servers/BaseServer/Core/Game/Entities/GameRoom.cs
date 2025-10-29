@@ -1,4 +1,4 @@
-using CommonLib;
+﻿using CommonLib;
 using CommonLib.Commands;
 using System;
 using System.Collections;
@@ -16,17 +16,42 @@ namespace BaseServer.Core.Game.Entities
     /// </summary>
     public class GameRoom
     {
-        public string RoomId { get; private set; }
-        public int MaxPlayers { get; private set; } = 2;
-        private List<ClientSession> m_players;
         private readonly object m_lockObj = new object();
+
+        public string RoomId { get; private set; }
+        public string Name { get; private set; } = string.Empty;
+
+        public const int MaxPlayers = 2;
+        public RoomState State { get; private set; }
+        public int MapID { get; private set; }
+        private GamePlayer[] m_players = new GamePlayer[MaxPlayers];
         private Game gameInstance = new Game();
 
-        public GameRoom(string _roomId)
+        public GameRoom(string _roomId, int mapID = 0)
         {
             RoomId = _roomId;
-            m_players = new List<ClientSession>();
             gameInstance = new Game();
+            State = RoomState.Open;
+            MapID = mapID;
+
+        }
+
+        public RoomInfo RoomInfo
+        {
+            get
+            {
+                lock (m_lockObj)
+                {
+                    return new RoomInfo()
+                    {
+                        RoomId = RoomId,
+                        RoomName = Name,
+                        RoomState = State,
+                        MaxPlayers = MaxPlayers,
+                        PlayerCount = PlayerCount,
+                    };
+                }
+            }
         }
 
         /// <summary>
@@ -38,7 +63,14 @@ namespace BaseServer.Core.Game.Entities
             {
                 lock (m_lockObj)
                 {
-                    return m_players.Count;
+                    int count = 0;
+                    foreach (var player in m_players)
+                    {
+                        if (player != null)
+                            count++;
+                    }
+
+                    return count;
                 }
             }
         }
@@ -52,7 +84,14 @@ namespace BaseServer.Core.Game.Entities
             {
                 lock (m_lockObj)
                 {
-                    return m_players.Count >= MaxPlayers;
+                    int count = 0;
+                    foreach (var player in m_players)
+                    {
+                        if (player != null)
+                            count++;
+                    }
+
+                    return count >= MaxPlayers;
                 }
             }
         }
@@ -66,7 +105,14 @@ namespace BaseServer.Core.Game.Entities
             {
                 lock (m_lockObj)
                 {
-                    return m_players.Count == 0;
+                    int count = 0;
+                    foreach (var player in m_players)
+                    {
+                        if (player != null)
+                            return false;
+                    }
+
+                    return true;
                 }
             }
         }
@@ -74,44 +120,60 @@ namespace BaseServer.Core.Game.Entities
         /// <summary>
         /// 플레이어를 룸에 추가
         /// </summary>
-        public bool AddPlayer(ClientSession _session)
+        public bool AddPlayer(ClientSession _session, int slot)
         {
             lock (m_lockObj)
             {
-                if (m_players.Count >= MaxPlayers)
+                if (m_players.Length >= MaxPlayers)
+                    return false;
+                if (slot < 0 || slot >= m_players.Length)
+                    return false;
+                if (m_players[slot] != null)
                     return false;
 
-                if (m_players.Contains(_session))
-                    return false;
-
-                m_players.Add(_session);
+                m_players[slot] = new GamePlayer(_session);
                 _session.CurrentRoom = this;
-                Console.WriteLine($"[Room {RoomId}] Player {_session.SessionId} joined. ({m_players.Count}/{MaxPlayers})");
 
                 // 다른 플레이어에게 입장 알림
-                BroadcastUserJoined(_session);
-                gameInstance.UserJoin(_session);
+                BroadcastUserJoined(m_players[slot]);
+                gameInstance.UserJoin(m_players[slot]);
 
                 return true;
             }
         }
 
+        public bool RemovePlayer(ClientSession _session)
+        {
+            for(int i = 0; i < m_players.Length; i++)
+            {
+                if (m_players[i] != null && m_players[i].Session.Equals(_session))
+                {
+                    return RemovePlayer(i);
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>
         /// 플레이어를 룸에서 제거
         /// </summary>
-        public bool RemovePlayer(ClientSession _session)
+        public bool RemovePlayer(int slot)
         {
             lock (m_lockObj)
             {
-                if (!m_players.Contains(_session))
+                if (slot < 0 || slot >= m_players.Length)
+                    return false;
+                if (m_players[slot] == null)
                     return false;
 
-                m_players.Remove(_session);
-                _session.CurrentRoom = null;
-                Console.WriteLine($"[Room {RoomId}] Player {_session.SessionId} left. ({m_players.Count}/{MaxPlayers})");
+                var player = m_players[slot];
+                m_players[slot] = null;
+                player.Session.CurrentRoom = null;
+                Console.WriteLine($"[Room {RoomId}] Player {player.Session.SessionId} left. ({PlayerCount}/{MaxPlayers})");
 
                 // 다른 플레이어에게 퇴장 알림
-                BroadcastUserLeft(_session);
+                BroadcastUserLeft(player.ID);
 
                 return true;
             }
@@ -130,7 +192,11 @@ namespace BaseServer.Core.Game.Entities
             List<ClientSession> playersCopy;
             lock (m_lockObj)
             {
-                playersCopy = new List<ClientSession>(m_players);
+                playersCopy = new List<ClientSession>();
+                foreach(var  player in m_players)
+                {
+                    playersCopy.Add(player.Session);
+                }
             }
 
             ChatMessage chatMsg = new ChatMessage
@@ -141,7 +207,7 @@ namespace BaseServer.Core.Game.Entities
                 MessageType = 0 // 0: LOBBY
             };
 
-            Protocol protocol = new Protocol(ProtocolType.CHAT_BROADCAST)
+            Protocol protocol = new Protocol(ProtocolType.BRODCAST_CHAT_MESSAGE)
                 .AddStruct("chatMessage", chatMsg);
 
             byte[] data = protocol.Serialize();
@@ -159,41 +225,42 @@ namespace BaseServer.Core.Game.Entities
             }
         }
 
-        /// <summary>
-        /// 유저 입장 알림 브로드캐스트
-        /// </summary>
-        private void BroadcastUserJoined(ClientSession _joinedSession)
+        private void Brodcast(Protocol proto)
         {
-            Protocol protocol = new Protocol(ProtocolType.USER_JOINED)
-                .AddParam("userId", _joinedSession.SessionId)
-                .AddParam("playerCount", m_players.Count);
-
-            byte[] data = protocol.Serialize();
+            byte[] data = proto.Serialize();
 
             foreach (var player in m_players)
             {
-                if (player != _joinedSession)
-                {
-                    _ = player.SendAsync(data);
-                }
+                if (player == null)
+                    continue;
+                _ = player.Session.SendAsync(data);
             }
+        }
+
+        /// <summary>
+        /// 유저 입장 알림 브로드캐스트
+        /// </summary>
+        private void BroadcastUserJoined(GamePlayer _joinedSession)
+        {
+            Protocol protocol = new Protocol(ProtocolType.USER_JOINED)
+                .AddParam("userId", _joinedSession.ID)
+                .AddParam("playerCount", PlayerCount);
+
+            byte[] data = protocol.Serialize();
+
+            Brodcast(protocol);
         }
 
         /// <summary>
         /// 유저 퇴장 알림 브로드캐스트
         /// </summary>
-        private void BroadcastUserLeft(ClientSession _leftSession)
+        private void BroadcastUserLeft(int sessionID)
         {
             Protocol protocol = new Protocol(ProtocolType.USER_LEFT)
-                .AddParam("userId", _leftSession.SessionId)
-                .AddParam("playerCount", m_players.Count);
+                .AddParam("userId", sessionID)
+                .AddParam("playerCount", PlayerCount);
 
-            byte[] data = protocol.Serialize();
-
-            foreach (var player in m_players)
-            {
-                _ = player.SendAsync(data);
-            }
+            Brodcast(protocol);
         }
 
         /// <summary>
@@ -204,7 +271,11 @@ namespace BaseServer.Core.Game.Entities
             List<ClientSession> playersCopy;
             lock (m_lockObj)
             {
-                playersCopy = new List<ClientSession>(m_players);
+                playersCopy = new List<ClientSession>();
+                foreach (var player in m_players)
+                {
+                    playersCopy.Add(player.Session);
+                }
             }
 
             Protocol protocol = new Protocol(ProtocolType.ROOM_CLOSED)
@@ -235,9 +306,9 @@ namespace BaseServer.Core.Game.Entities
             {
                 foreach (var player in m_players)
                 {
-                    player.Disconnect();
+                    player.Session.Disconnect();
                 }
-                m_players.Clear();
+                Array.Clear(m_players, 0, m_players.Length);
             }
         }
     }

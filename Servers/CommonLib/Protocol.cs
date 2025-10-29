@@ -442,25 +442,6 @@ namespace CommonLib
         }
     }
 
-    // 클래스 예제
-    public class GameRoom
-    {
-        public string RoomId { get; set; }
-        public List<string> Players { get; set; }
-        public int MaxPlayers { get; set; }
-        public bool IsStarted { get; set; }
-
-        public GameRoom()
-        {
-            Players = new List<string>();
-        }
-
-        public override string ToString()
-        {
-            return $"Room({RoomId}): {Players.Count}/{MaxPlayers}, Started={IsStarted}";
-        }
-    }
-
     public class GameSettings
     {
         public string MapName { get; set; }
@@ -475,86 +456,6 @@ namespace CommonLib
         public override string ToString()
         {
             return $"Settings: Map={MapName}, Time={TimeLimit}s";
-        }
-    }
-
-    public class ProtocolExample
-    {
-        public static void Example()
-        {
-            // 1. 구조체 생성
-            PlayerData player1 = new PlayerData
-            {
-                PlayerId = "player1",
-                X = 10.5f,
-                Y = 20.3f,
-                Hp = 100,
-                IsAlive = true
-            };
-
-            Vector3Data velocity = new Vector3Data
-            {
-                X = 1.0f,
-                Y = 0.5f,
-                Z = 0.0f
-            };
-
-            // 2. 클래스 생성
-            GameRoom room = new GameRoom
-            {
-                RoomId = "room_001",
-                MaxPlayers = 4,
-                IsStarted = false
-            };
-            room.Players.Add("player1");
-            room.Players.Add("player2");
-
-            GameSettings settings = new GameSettings
-            {
-                MapName = "Desert Arena",
-                TimeLimit = 300
-            };
-            settings.Scores["player1"] = 150;
-            settings.Scores["player2"] = 120;
-
-            // 3. 프로토콜 생성 (구조체 + 클래스 혼합)
-            Protocol gameState = new Protocol(1001)
-                .AddStruct("player1", player1)
-                .AddStruct("velocity", velocity)
-                .AddObject("room", room)
-                .AddObject("settings", settings)
-                .AddParam("frameCount", 12345)
-                .AddParam("gameName", "MyAwesomeGame");
-
-            Console.WriteLine("Original:");
-            Console.WriteLine(gameState.ToString());
-
-            // 4. 직렬화
-            byte[] serialized = gameState.Serialize();
-            Console.WriteLine($"\nSerialized Size: {serialized.Length} bytes");
-
-            // 5. 역직렬화
-            Protocol deserialized = Protocol.Deserialize(serialized);
-            Console.WriteLine("\nDeserialized:");
-
-            // 6. 구조체 추출
-            PlayerData receivedPlayer = deserialized.GetStruct<PlayerData>("player1");
-            Vector3Data receivedVelocity = deserialized.GetStruct<Vector3Data>("velocity");
-
-            // 7. 클래스 추출
-            GameRoom receivedRoom = deserialized.GetObject<GameRoom>("room");
-            GameSettings receivedSettings = deserialized.GetObject<GameSettings>("settings");
-
-            // 8. 기본 타입 추출
-            int frameCount = deserialized.GetParam<int>("frameCount");
-            string gameName = deserialized.GetParam<string>("gameName");
-
-            Console.WriteLine($"\nExtracted Values:");
-            Console.WriteLine(receivedPlayer.ToString());
-            Console.WriteLine(receivedVelocity.ToString());
-            Console.WriteLine(receivedRoom.ToString());
-            Console.WriteLine(receivedSettings.ToString());
-            Console.WriteLine($"Frame: {frameCount}, Game: {gameName}");
         }
     }
 }

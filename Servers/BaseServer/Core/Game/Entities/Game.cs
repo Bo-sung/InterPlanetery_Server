@@ -1,4 +1,4 @@
-using BaseServer.Core.Game.Session;
+﻿using BaseServer.Core.Game.Session;
 using BaseServer.Database;
 ﻿using CommonLib.Commands; // IGameCommand
 using BaseServer.Services; // MapService
@@ -33,7 +33,7 @@ namespace BaseServer.Core.Game.Entities
         private MapService _mapService;
         private DBManager _dbManager;
 
-        protected ClientSession?[] players = new ClientSession[MAX_PLAYERS];
+        protected GamePlayer?[] players = new GamePlayer[MAX_PLAYERS];
 
         public Game() 
         {
@@ -55,7 +55,7 @@ namespace BaseServer.Core.Game.Entities
             }
         }
 
-        public void UserJoin(ClientSession player)
+        public void UserJoin(GamePlayer player)
         {
             for (int i = 0; i < MAX_PLAYERS; i++)
             {

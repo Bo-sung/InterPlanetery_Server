@@ -1,4 +1,4 @@
-using BaseServer.Core.Game.Entities;
+﻿using BaseServer.Core.Game.Entities;
 using BaseServer.Core.Game.Managers;
 using BaseServer.Network;
 using System;
@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommonLib;
+using static BaseServer.Network.ProtocolHandler;
 
 namespace BaseServer.Core.Game.Session
 {
@@ -52,9 +53,12 @@ namespace BaseServer.Core.Game.Session
         /// </summary>
         protected virtual void RegisterProtocolHandlers()
         {
-            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.CHAT_MESSAGE, HandleChatMessage);
-            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.LEAVE_ROOM, HandleLeaveRoom);
             m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.HEARTBEAT, HandleHeartbeat);
+        }
+
+        public void RegisterProto(int Protocol, ProtocolHandlerDelegate handler)
+        {
+            m_protocolHandler.RegisterHandler(Protocol, handler);
         }
 
         /// <summary>
@@ -64,19 +68,6 @@ namespace BaseServer.Core.Game.Session
         {
             try
             {
-                // 매칭하여 룸에 입장
-                Entities.GameRoom room = RoomManager.Instance.MatchPlayer(this);
-
-                if (room == null)
-                {
-                    await SendErrorAsync("Failed to join room");
-                    Disconnect();
-                    return;
-                }
-
-                // 입장 성공 메시지 전송
-                await SendJoinSuccessAsync(room);
-
                 // 타임아웃 체크 타이머 시작
                 StartTimeoutCheck();
 
@@ -122,7 +113,7 @@ namespace BaseServer.Core.Game.Session
         /// <summary>
         /// 마지막 활동 시간 갱신
         /// </summary>
-        protected void UpdateLastActivity()
+        public void UpdateLastActivity()
         {
             m_lastActivityTime = DateTime.UtcNow;
         }
@@ -255,80 +246,12 @@ namespace BaseServer.Core.Game.Session
         }
 
         /// <summary>
-        /// 채팅 메시지 처리
-        /// </summary>
-        private async Task HandleChatMessage(Protocol _protocol)
-        {
-            string message = _protocol.GetParam<string>("message");
-
-            if (string.IsNullOrEmpty(message))
-                return;
-
-            UpdateLastActivity(); // 활동 갱신
-
-            // "-1" 명령어 체크
-            if (message.Trim() == "-1")
-            {
-                await HandleLeaveRoom(_protocol);
-                return;
-            }
-
-            Console.WriteLine($"[Session {SessionId}] Chat: {message}");
-
-            if (CurrentRoom != null)
-            {
-                await CurrentRoom.BroadcastMessage(this, message);
-            }
-        }
-
-        /// <summary>
-        /// 룸 나가기 처리
-        /// </summary>
-        private async Task HandleLeaveRoom(Protocol _protocol)
-        {
-            if (CurrentRoom != null)
-            {
-                Console.WriteLine($"[Session {SessionId}] Leaving room {CurrentRoom.RoomId}");
-
-                CurrentRoom.RemovePlayer(this);
-
-                // 퇴장 성공 메시지 전송
-                Protocol leaveSuccessProtocol = new Protocol(CommonLib.ProtocolType.LEAVE_SUCCESS)
-                    .AddParam("message", "You have left the room");
-
-                await SendAsync(leaveSuccessProtocol.Serialize());
-
-                // 연결 종료
-                Disconnect();
-            }
-        }
-
-        /// <summary>
-        /// 입장 성공 메시지 전송
-        /// </summary>
-        private async Task SendJoinSuccessAsync(Entities.GameRoom _room)
-        {
-            RoomInfo roomInfo = new RoomInfo
-            {
-                RoomId = _room.RoomId,
-                PlayerCount = _room.PlayerCount,
-                MaxPlayers = _room.MaxPlayers
-            };
-
-            Protocol protocol = new Protocol(CommonLib.ProtocolType.JOIN_SUCCESS)
-                .AddParam("sessionId", SessionId)
-                .AddStruct("roomInfo", roomInfo)
-                .AddParam("message", $"Welcome to {_room.RoomId}! Type '-1' to leave.");
-
-            await SendAsync(protocol.Serialize());
-        }
-
-        /// <summary>
         /// 에러 메시지 전송
         /// </summary>
         private async Task SendErrorAsync(string _errorMessage)
         {
-            Protocol protocol = new Protocol(CommonLib.ProtocolType.ERROR)
+            Protocol protocol = new Protocol(CommonLib.ProtocolType.RESPONSE)
+                .AddParam("result", (byte)ServerMessage.Error)
                 .AddParam("message", _errorMessage);
 
             await SendAsync(protocol.Serialize());

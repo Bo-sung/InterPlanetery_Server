@@ -1,4 +1,4 @@
-using BaseServer.Core.Game.Entities;
+﻿using BaseServer.Core.Game.Entities;
 using BaseServer.Core.Game.Session;
 using System;
 using System.Collections.Concurrent;
@@ -91,29 +91,6 @@ namespace BaseServer.Core.Game.Managers
         }
 
         /// <summary>
-        /// 플레이어를 매칭하여 룸에 배치
-        /// </summary>
-        public GameRoom MatchPlayer(ClientSession _session)
-        {
-            // 사용 가능한 룸 찾기
-            GameRoom room = FindAvailableRoom();
-
-            // 없으면 새로 생성
-            if (room == null)
-            {
-                room = CreateRoom();
-            }
-
-            // 플레이어를 룸에 추가
-            if (room != null && room.AddPlayer(_session))
-            {
-                return room;
-            }
-
-            return null;
-        }
-
-        /// <summary>
         /// 룸 제거
         /// </summary>
         public bool RemoveRoom(string _roomId)
@@ -155,7 +132,7 @@ namespace BaseServer.Core.Game.Managers
             Console.WriteLine($"[RoomManager] Total rooms: {m_rooms.Count}");
             foreach (var kvp in m_rooms)
             {
-                Console.WriteLine($"  - {kvp.Key}: {kvp.Value.PlayerCount}/{kvp.Value.MaxPlayers} players");
+                Console.WriteLine($"  - {kvp.Key}: {kvp.Value.PlayerCount}/{GameRoom.MaxPlayers} players");
             }
         }
 

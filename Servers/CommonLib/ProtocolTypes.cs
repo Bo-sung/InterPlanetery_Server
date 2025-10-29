@@ -6,37 +6,31 @@
 	public static class ProtocolType
 	{
 		// 클라이언트 -> 서버
-		public const int JOIN_ROOM = 1001;          // 룸 입장 요청
-		public const int LEAVE_ROOM = 1002;         // 룸 퇴장 요청
-		public const int CHAT_MESSAGE = 1003;       // 채팅 메시지 전송
-		public const int HEARTBEAT = 1004;          // 하트비트 (연결 유지 확인)
-		public const int CREATE_ROOM = 3100;        // 방 생성 요청
-		public const int JOIN_ROOM_REQUEST = 3101;  // 방 입장 요청 (상세)
-		public const int GET_ROOM_LIST = 3103;      // 룸 목록 조회 요청
-		public const int READY = 3104;              // 게임 준비 완료
-        public const int GET_MAP_LIST = 3105;       // 맵 목록 조회 요청
-        public const int GET_TABLE_DATA = 3106;     // 테이블 데이터 조회 요청
+		public const int REQUEST_LOGIN			= 10000;        // 로그인 요청
+		public const int REQUEST_LOGOUT = 10001;                //로그아웃 요청
+        public const int CHAT_MESSAGE = 10002;                  //메세지 전송
+        public const int HEARTBEAT = 10003;						// 하트비트 (연결 유지 확인)
+		public const int REQUEST_TABLEDATA = 10004;				// 테이블 데이터 요청
 
-		// 서버 -> 클라이언트
-		public const int JOIN_SUCCESS = 2001;       // 입장 성공
-		public const int JOIN_FAILED = 2002;        // 입장 실패
-		public const int LEAVE_SUCCESS = 2003;      // 퇴장 성공
-		public const int USER_JOINED = 2004;        // 다른 유저 입장 알림
-		public const int USER_LEFT = 2005;          // 다른 유저 퇴장 알림
-		public const int CHAT_BROADCAST = 2006;     // 채팅 메시지 브로드캐스트
-		public const int ROOM_CLOSED = 2007;        // 룸 종료 알림
-		public const int HEARTBEAT_ACK = 2008;      // 하트비트 응답
-		public const int ERROR = 2999;              // 에러 메시지
-		public const int ROOM_JOINED = 4201;        // 방 입장 완료 알림
-		public const int PLAYER_JOINED_ROOM = 4203; // 플레이어 방 입장 알림
-		public const int PLAYER_LEFT_ROOM = 4204;   // 플레이어 방 퇴장 알림
-		public const int ROOM_LIST = 4205;          // 룸 목록 응답
-		public const int PLAYER_READY_STATE = 4206; // 플레이어 준비 상태 알림
-        public const int MAP_LIST = 4210;           // 맵 목록 응답
-        public const int TABLE_DATA = 4211;         // 테이블 데이터 응답
+        public const int REQUEST_JOIN_LOBBY = 10010;            //로비 접속 요청
+		public const int REFRESH_LOBBY = 10011;                 //로비 새로고침 요청
+		public const int REQUEST_CREATE_ROOM = 10012;           //방 생성 요청
+		public const int REQUEST_JOIN_ROOM = 10013;             //방 입장 요청
+		public const int REQUEST_READY = 10014;                 // 게임 레디
+		public const int REQUEST_LEFT_ROOM = 10015;             // 방 퇴장 요청
 
-		public const int SUBMIT_COMMAND = 3010;
+        // 서버 -> 클라이언트
+        public const int RESPONSE = 20000;						// 전체 공통 응답처리
+        public const int BRODCAST_SYSTEM = 20001;               // 시스템 공통 알림
+        public const int BRODCAST_CHAT_MESSAGE = 20002;			// 메시지 브로드캐스트
+        public const int HEARTBEAT_ACK = 20003;					// 하트비트 응답
 
+        public const int USER_JOINED = 20010;                   // 유저 접속 알림
+		public const int USER_LEFT = 20011;                     // 유저 이탈 알림
+		public const int ROOM_INFO_CHANGED = 20012;             // 방 정보 변경 알림
+        public const int ROOM_CLOSED = 20013;					// 방 삭제 알림
+
+        public const int SUBMIT_COMMAND = 3010;
     }
 
 	/// <summary>
@@ -63,6 +57,9 @@
 		public string RoomId { get; set; }
 		public int PlayerCount { get; set; }
 		public int MaxPlayers { get; set; }
+		public string RoomName { get; set; }
+		public RoomState RoomState { get; set; }
+		public int MapID { get; set; }
 
 		public override string ToString()
 		{
