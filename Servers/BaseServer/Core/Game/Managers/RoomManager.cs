@@ -69,7 +69,7 @@ namespace BaseServer.Core.Game.Managers
         /// <summary>
         /// 룸 ID로 룸 가져오기
         /// </summary>
-        public GameRoom GetRoom(string _roomId)
+        public GameRoom? GetRoom(string _roomId)
         {
             m_rooms.TryGetValue(_roomId, out GameRoom room);
             return room;

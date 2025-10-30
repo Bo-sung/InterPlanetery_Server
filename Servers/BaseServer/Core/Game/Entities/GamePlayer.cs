@@ -6,6 +6,8 @@ using System.Net.Sockets;
 using System.Windows.Input;
 using BaseServer.Core.Game.Session;
 using ProtocolType = CommonLib.ProtocolType;
+using System.Reflection.Emit;
+using MySqlX.XDevAPI;
 
 namespace BaseServer.Core.Game.Entities
 {
@@ -15,22 +17,43 @@ namespace BaseServer.Core.Game.Entities
     /// </summary>
     public class GamePlayer
     {
-        private ClientSession clientSession;
-        public ClientSession Session => clientSession;
-        private int m_id = 0;
-        private string m_name = "";
+        #region 상수
+        const int DEFAULT_ID = -1;
+        const string DEFAULT_NAME = "IVALID";
+        #endregion
 
+        #region 세션 및 기본 필드
+        protected ClientSession? clientSession;
+        protected int m_id = DEFAULT_ID;        // 유저 식별자
+        protected string m_name = DEFAULT_NAME; // 유저 닉네임
+        private bool m_isDefeated = false;
+        #endregion
+
+        #region 자원 관련 필드
         private int m_gas = 0;
         private int m_mineral = 0;
         private int m_supply = 0;
+        #endregion
 
+        #region 게임 오브젝트 필드
         private List<int> m_fleets = new List<int>();
         private List<int> m_planets = new List<int>();
         private Queue<int> m_productionOrder = new Queue<int>();
-
         private int m_faction = 0; // 진영 정보
         private int m_homeworld = 0; // 본진 행성 ID
-        private bool m_isDefeated = false;
+        #endregion
+
+        #region 프로퍼티
+        public ClientSession Session => clientSession;
+        public bool IsValid
+        {
+            get
+            {
+                return clientSession != null
+                    && m_id != DEFAULT_ID
+                    && m_name != DEFAULT_NAME;
+            }
+        }
 
         public int ID { get { return m_id; } set { m_id = value; } }
         public string Name { get { return m_name; } set { m_name = value; } }
@@ -46,16 +69,45 @@ namespace BaseServer.Core.Game.Entities
         public List<int> Fleets { get { return m_fleets; } }
         public List<int> Planets { get { return m_planets; } }
         public Queue<int> ProductionOrder { get { return m_productionOrder; } }
+        #endregion
 
-        public GamePlayer(ClientSession clientSession)
+        public GamePlayer()
+        {
+        }
+
+        #region 초기화 및 정리
+        public void Initilaize(ClientSession clientSession)
         {
             this.clientSession = clientSession;
             RegistorProtos();
         }
 
+        /// <summary>
+        /// 세션 빼기
+        /// </summary>
+        public void Cleanup()
+        {
+            this.clientSession = null;
+            m_id = DEFAULT_ID;
+            m_name = DEFAULT_NAME;
+
+            UnRegistorProtos();
+        }
+        #endregion
+
+        #region 프로토콜 처리
         private void RegistorProtos()
         {
+            if (clientSession == null)
+                return;
             clientSession.RegisterProto(ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
+        }
+
+        protected virtual void UnRegistorProtos()
+        {
+            if (clientSession == null)
+                return;
+            clientSession.UnRegisterProto(ProtocolType.SUBMIT_COMMAND);
         }
 
         /// <summary>
@@ -96,16 +148,17 @@ namespace BaseServer.Core.Game.Entities
                 await clientSession.CurrentRoom.AddCommand(command);
             }
         }
+        #endregion
 
-        public void HandleResurceExcute(long tick)
+        #region 게임 로직
+        public void Update_Resource(long tick)
         {
             // 틱당 자원 처리
             // 점령한 행성들의 자원 총합
             int tickGas = 0;
             int tickMin = 0;
             int tickSup = 0;
-
-
         }
+        #endregion
     }
 }

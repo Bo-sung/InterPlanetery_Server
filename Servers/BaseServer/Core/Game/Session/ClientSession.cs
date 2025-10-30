@@ -20,9 +20,11 @@ namespace BaseServer.Core.Game.Session
         public string SessionId { get; private set; }
         public TcpClient TcpClient { get; private set; }
         public Entities.GameRoom? CurrentRoom { get; set; }
+        public UserInfo UserInfo => m_userInfo;
 
         private NetworkStream m_stream;
         private bool m_isConnected = true;
+        private UserInfo m_userInfo;
         private readonly object m_sendLock = new object();
 
         // 타임아웃 관련
@@ -59,6 +61,11 @@ namespace BaseServer.Core.Game.Session
         public void RegisterProto(int Protocol, ProtocolHandlerDelegate handler)
         {
             m_protocolHandler.RegisterHandler(Protocol, handler);
+        }
+
+        public void UnRegisterProto(int Protocol)
+        {
+            m_protocolHandler.UnregisterHandler(Protocol);
         }
 
         /// <summary>
@@ -311,7 +318,7 @@ namespace BaseServer.Core.Game.Session
             // 룸에서 제거
             if (CurrentRoom != null)
             {
-                CurrentRoom.RemovePlayer(this);
+                CurrentRoom.TryRemovePlayer(this);
                 CurrentRoom = null;
             }
 

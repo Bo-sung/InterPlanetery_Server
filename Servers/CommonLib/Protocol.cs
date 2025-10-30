@@ -4,6 +4,27 @@ using Newtonsoft.Json.Linq;
 
 namespace CommonLib
 {
+    public enum StateCode
+    {
+        SUCCESS = 0,            // 성공
+        FAIL = 1,               // 실패
+        AUTH_FAILURE = 2,       // 인증 실패
+        ACCESS_DENY = 3,        // 권한 부족
+        NO_RESOURCE = 4,        // 리소스 없음
+        SERVER_ERROR = 5,       // 서버 에러
+    }
+    public class Response : Protocol
+    {
+        public Response(int responseId, StateCode status, string message = "") : base(ProtocolType.RESPONSE)
+        {
+            AddParam("protoId", responseId);
+            AddParam("status", (byte)status);
+            if (message == "")
+                message = status.ToString();
+            AddParam("message", message);
+        }
+    }
+
     /// <summary>
     /// 크로스-플랫폼 및 네트워크 통신용 프로토콜 클래스
     /// JSON 기반 직렬화로 구조체/클래스 지원 (Newtonsoft.Json 사용)

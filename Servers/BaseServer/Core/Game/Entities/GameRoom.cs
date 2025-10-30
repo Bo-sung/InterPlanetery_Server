@@ -16,26 +16,28 @@ namespace BaseServer.Core.Game.Entities
     /// </summary>
     public class GameRoom
     {
-        private readonly object m_lockObj = new object();
+        #region 상수
+        public const int MaxPlayers = 2;
+        #endregion
 
+        #region 필드
+        private readonly object m_lockObj = new object();
+        private GameRoomUser[] m_users = new GameRoomUser[MaxPlayers];
+        private Game gameInstance = new Game();
+        #endregion
+
+        #region 기본 속성
         public string RoomId { get; private set; }
         public string Name { get; private set; } = string.Empty;
-
-        public const int MaxPlayers = 2;
         public RoomState State { get; private set; }
         public int MapID { get; private set; }
-        private GamePlayer[] m_players = new GamePlayer[MaxPlayers];
-        private Game gameInstance = new Game();
+        public int ChatChID => -1; // 채팅 체널 ID. 추후 구현
+        #endregion
 
-        public GameRoom(string _roomId, int mapID = 0)
-        {
-            RoomId = _roomId;
-            gameInstance = new Game();
-            State = RoomState.Open;
-            MapID = mapID;
-
-        }
-
+        #region 계산된 속성
+        /// <summary>
+        /// 룸 정보 객체
+        /// </summary>
         public RoomInfo RoomInfo
         {
             get
@@ -64,9 +66,9 @@ namespace BaseServer.Core.Game.Entities
                 lock (m_lockObj)
                 {
                     int count = 0;
-                    foreach (var player in m_players)
+                    foreach (var player in m_users)
                     {
-                        if (player != null)
+                        if (player.IsValid)
                             count++;
                     }
 
@@ -85,9 +87,9 @@ namespace BaseServer.Core.Game.Entities
                 lock (m_lockObj)
                 {
                     int count = 0;
-                    foreach (var player in m_players)
+                    foreach (var player in m_users)
                     {
-                        if (player != null)
+                        if (player.IsValid)
                             count++;
                     }
 
@@ -105,10 +107,9 @@ namespace BaseServer.Core.Game.Entities
             {
                 lock (m_lockObj)
                 {
-                    int count = 0;
-                    foreach (var player in m_players)
+                    foreach (var player in m_users)
                     {
-                        if (player != null)
+                        if (player.IsValid)
                             return false;
                     }
 
@@ -116,37 +117,133 @@ namespace BaseServer.Core.Game.Entities
                 }
             }
         }
+        #endregion
 
+        #region 생성자
+        public GameRoom(string _roomId, int mapID = 0)
+        {
+            RoomId = _roomId;
+            gameInstance = new Game();
+            State = RoomState.Open;
+            MapID = mapID;
+
+            for (int i = 0; i < MaxPlayers; i++)
+            {
+                m_users[i] = new GameRoomUser();
+                m_users[i].OnChangedReady += HandleOnReady;
+            }
+        }
+        #endregion
+
+        #region 룸 관리 메소드
+        public int NextSlot()
+        {
+            for (int i = 0; i < MaxPlayers; i++)
+            {
+                if (!m_users[i].IsValid)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private void HandleOnReady()
+        {
+            bool isReady = false;
+            foreach(var player in m_users)
+            {
+                isReady = isReady && player.IsValid && player.IsReady;
+            }
+
+            if(isReady)
+            {
+                foreach(var player in m_users)
+                {
+                    gameInstance.UserJoin(player.Session);
+                }
+            }
+        }
+
+        public void UpdateRoomInfo(string name = "", int mapId = -1)
+        {
+            if (!name.Equals(""))
+                Name = name;
+
+            if (mapId != -1)
+                MapID = mapId;
+
+            Protocol proto = new Protocol(ProtocolType.ROOM_INFO_CHANGED);
+            proto.AddParam("roomId", RoomId);
+            proto.AddStruct("roomInfo", RoomInfo);
+
+            Brodcast(proto);
+        }
+
+        /// <summary>
+        /// 룸 종료 알림을 모든 플레이어에게 전송
+        /// </summary>
+        public async Task NotifyRoomClosed()
+        {
+            List<GameRoomUser> playersCopy;
+            lock (m_lockObj)
+            {
+                playersCopy = new List<GameRoomUser>();
+                foreach (var player in m_users)
+                {
+                    playersCopy.Add(player);
+                }
+            }
+
+            Protocol protocol = new Protocol(ProtocolType.ROOM_CLOSED)
+                .AddParam("roomId", RoomId)
+                .AddParam("reason", "Room has been closed");
+
+            byte[] data = protocol.Serialize();
+
+            foreach (var player in playersCopy)
+            {
+                try
+                {
+                    await player.HandleBrodcast(data);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"[Room {RoomId}] Failed to notify room closure to {player.ID}: {e.Message}");
+                }
+            }
+        }
+        #endregion
+
+        #region 플레이어 관리 메소드
         /// <summary>
         /// 플레이어를 룸에 추가
         /// </summary>
-        public bool AddPlayer(ClientSession _session, int slot)
+        public bool TryAddPlayer(ClientSession _session, int slot)
         {
             lock (m_lockObj)
             {
-                if (m_players.Length >= MaxPlayers)
+                if (m_users.Length >= MaxPlayers)
                     return false;
-                if (slot < 0 || slot >= m_players.Length)
+                if (slot < 0 || slot >= m_users.Length)
                     return false;
-                if (m_players[slot] != null)
+                if (m_users[slot] != null)
                     return false;
 
-                m_players[slot] = new GamePlayer(_session);
+                m_users[slot].Initialize(_session);
                 _session.CurrentRoom = this;
 
                 // 다른 플레이어에게 입장 알림
-                BroadcastUserJoined(m_players[slot]);
-                gameInstance.UserJoin(m_players[slot]);
+                BroadcastUserJoined(m_users[slot]);
 
                 return true;
             }
         }
 
-        public bool RemovePlayer(ClientSession _session)
+        public bool TryRemovePlayer(ClientSession _session)
         {
-            for(int i = 0; i < m_players.Length; i++)
+            for (int i = 0; i < m_users.Length; i++)
             {
-                if (m_players[i] != null && m_players[i].Session.Equals(_session))
+                if (m_users[i] != null && m_users[i].IsSameSession(_session))
                 {
                     return RemovePlayer(i);
                 }
@@ -162,28 +259,47 @@ namespace BaseServer.Core.Game.Entities
         {
             lock (m_lockObj)
             {
-                if (slot < 0 || slot >= m_players.Length)
+                if (slot < 0 || slot >= m_users.Length)
                     return false;
-                if (m_players[slot] == null)
+                if (m_users[slot] == null)
                     return false;
 
-                var player = m_players[slot];
-                m_players[slot] = null;
-                player.Session.CurrentRoom = null;
-                Console.WriteLine($"[Room {RoomId}] Player {player.Session.SessionId} left. ({PlayerCount}/{MaxPlayers})");
+                var playerId = m_users[slot].ID;
+                var playerName = m_users[slot].Name;
+                m_users[slot].Cleanup();
+                Console.WriteLine($"[Room {RoomId}] Player {playerId} left. ({PlayerCount}/{MaxPlayers})");
 
                 // 다른 플레이어에게 퇴장 알림
-                BroadcastUserLeft(player.ID);
+                BroadcastUserLeft(playerId);
 
                 return true;
             }
         }
 
+        /// <summary>
+        /// 룸의 모든 플레이어 연결 종료
+        /// </summary>
+        public void CloseAllConnections()
+        {
+            lock (m_lockObj)
+            {
+                foreach (var player in m_users)
+                {
+                    player.ForceDisconnect();
+                }
+                Array.Clear(m_users, 0, m_users.Length);
+            }
+        }
+        #endregion
+
+        #region 게임 로직
         public async Task AddCommand(IGameCommand command)
         {
             gameInstance.EnqueueCommand(command);
         }
+        #endregion
 
+        #region 브로드캐스트 메소드
         /// <summary>
         /// 채팅 메시지를 룸의 모든 플레이어에게 브로드캐스트
         /// </summary>
@@ -193,7 +309,7 @@ namespace BaseServer.Core.Game.Entities
             lock (m_lockObj)
             {
                 playersCopy = new List<ClientSession>();
-                foreach(var  player in m_players)
+                foreach (var player in m_users)
                 {
                     playersCopy.Add(player.Session);
                 }
@@ -229,18 +345,18 @@ namespace BaseServer.Core.Game.Entities
         {
             byte[] data = proto.Serialize();
 
-            foreach (var player in m_players)
+            foreach (var player in m_users)
             {
                 if (player == null)
                     continue;
-                _ = player.Session.SendAsync(data);
+                _ = player.HandleBrodcast(data);
             }
         }
 
         /// <summary>
         /// 유저 입장 알림 브로드캐스트
         /// </summary>
-        private void BroadcastUserJoined(GamePlayer _joinedSession)
+        private void BroadcastUserJoined(GameRoomUser _joinedSession)
         {
             Protocol protocol = new Protocol(ProtocolType.USER_JOINED)
                 .AddParam("userId", _joinedSession.ID)
@@ -262,55 +378,7 @@ namespace BaseServer.Core.Game.Entities
 
             Brodcast(protocol);
         }
-
-        /// <summary>
-        /// 룸 종료 알림을 모든 플레이어에게 전송
-        /// </summary>
-        public async Task NotifyRoomClosed()
-        {
-            List<ClientSession> playersCopy;
-            lock (m_lockObj)
-            {
-                playersCopy = new List<ClientSession>();
-                foreach (var player in m_players)
-                {
-                    playersCopy.Add(player.Session);
-                }
-            }
-
-            Protocol protocol = new Protocol(ProtocolType.ROOM_CLOSED)
-                .AddParam("roomId", RoomId)
-                .AddParam("reason", "Room has been closed");
-
-            byte[] data = protocol.Serialize();
-
-            foreach (var player in playersCopy)
-            {
-                try
-                {
-                    await player.SendAsync(data);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"[Room {RoomId}] Failed to notify room closure to {player.SessionId}: {e.Message}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// 룸의 모든 플레이어 연결 종료
-        /// </summary>
-        public void CloseAllConnections()
-        {
-            lock (m_lockObj)
-            {
-                foreach (var player in m_players)
-                {
-                    player.Session.Disconnect();
-                }
-                Array.Clear(m_players, 0, m_players.Length);
-            }
-        }
+        #endregion
     }
 
     public enum GameCommandType

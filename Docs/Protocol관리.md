@@ -114,7 +114,7 @@
 ### REQUEST_READY
 - ID: 10014
 - 파라미터:
-  - ready_state: boolean
+  - isReady: boolean
 - 응답 param:
 
 ### REQUEST_LEFT_ROOM
@@ -129,7 +129,6 @@
   - protoId: int
   - status: int
   - message: string
-  - request_id: int
   - data: object
 
 ### BRODCAST_SYSTEM
@@ -181,7 +180,7 @@
 ## 구조체 정의
 
 ### UserData
-- userId: string
+- userId: int
 - username: string
 
 ### RoomInfo
