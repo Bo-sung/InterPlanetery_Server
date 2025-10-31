@@ -1,3 +1,5 @@
+
+using ChatClientWPF.Database;
 using ChatClientWPF.Views;
 using CommonLib;
 using MySql.Data.MySqlClient;
@@ -102,7 +104,12 @@ namespace ChatClientWPF.Presenters
                 // AppConfig에 저장
                 AppConfig.Instance.SaveConfig(config);
 
-                _view.ShowSuccess("Settings saved successfully to appsettings.json!\n\nNote: Some components may need to be reinitialized to use the new settings.");
+                // DBManager 캐시 업데이트
+                Debug.WriteLine("Updating DBManager cache with new settings...");
+                DBManager.Instance.UpdateTable(AppConfig.Instance.DatabaseConnectionString);
+                Debug.WriteLine("DBManager cache updated.");
+
+                _view.ShowSuccess("Settings saved successfully to appsettings.json!\n\nDatabase cache has been reloaded.");
                 Debug.WriteLine("=== 설정 저장 완료 ===");
             }
             catch (Exception ex)
@@ -128,7 +135,12 @@ namespace ChatClientWPF.Presenters
                 // View에 반영
                 LoadCurrentSettings();
 
-                _view.ShowInfo("Settings reloaded from appsettings.json successfully!");
+                // DBManager 캐시 업데이트
+                Debug.WriteLine("Updating DBManager cache after reloading settings...");
+                DBManager.Instance.UpdateTable(AppConfig.Instance.DatabaseConnectionString);
+                Debug.WriteLine("DBManager cache updated.");
+
+                _view.ShowInfo("Settings reloaded from appsettings.json successfully!\nDatabase cache has been reloaded.");
                 Debug.WriteLine("=== 설정 다시 로드 완료 ===");
             }
             catch (Exception ex)
@@ -156,21 +168,18 @@ namespace ChatClientWPF.Presenters
 
                 Debug.WriteLine($"Testing connection: {connectionString.Replace(_view.DatabasePassword, "***")}");
 
-                // MySQL 연결 테스트
-                using (var connection = new MySqlConnection(connectionString))
-                {
-                    connection.Open();
-                    Debug.WriteLine("연결 테스트 성공!");
+                var (success, message) = DBManager.Instance.TestConnection(connectionString);
 
-                    // 서버 버전 확인
-                    string serverVersion = connection.ServerVersion;
-                    _view.ShowSuccess($"Connection test successful!\n\nServer Version: {serverVersion}");
+                if (success)
+                {
+                    Debug.WriteLine("연결 테스트 성공!");
+                    _view.ShowSuccess(message);
                 }
-            }
-            catch (MySqlException mysqlEx)
-            {
-                Debug.WriteLine($"MySQL 연결 실패: {mysqlEx.Message}");
-                _view.ShowError($"Database connection failed:\n\n{mysqlEx.Message}\n\nPlease check your database settings.");
+                else
+                {
+                    Debug.WriteLine($"MySQL 연결 실패");
+                    _view.ShowError(message);
+                }
             }
             catch (Exception ex)
             {
@@ -248,3 +257,4 @@ namespace ChatClientWPF.Presenters
         }
     }
 }
+

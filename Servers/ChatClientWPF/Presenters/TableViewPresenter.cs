@@ -1,6 +1,8 @@
+
+using ChatClientWPF.Database;
 using ChatClientWPF.Views;
 using CommonLib;
-using BaseServer.Database;
+using ChatClientWPF.Database;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,7 +16,6 @@ namespace ChatClientWPF.Presenters
     public class TableViewPresenter
     {
         private readonly ITableViewView _view;
-        private readonly DB_Table _dbTable;
         private readonly Dictionary<string, Func<object>> _tableDataProviders;
 
         public TableViewPresenter(ITableViewView view)
@@ -25,47 +26,19 @@ namespace ChatClientWPF.Presenters
             _view.OnRefreshClicked += HandleRefreshClicked;
             _view.OnTableSelected += HandleTableSelected;
 
-            // DB 테이블 초기화
-            _dbTable = new DB_Table();
-            LoadTablesFromDB();
-
             // 테이블 데이터 제공자 초기화
             _tableDataProviders = new Dictionary<string, Func<object>>
             {
-                ["fleet_info"] = () => _dbTable.Fleet_info,
-                ["map_info"] = () => _dbTable.Map_info,
-                ["map_planet_info"] = () => _dbTable.Map_Planet_info,
-                ["map_route_info"] = () => _dbTable.Map_Route_info,
-                ["planet_info"] = () => _dbTable.Planet_info,
-                ["production_info"] = () => _dbTable.Production_info
+                ["fleet_info"] = () => DBManager.Instance.Table.Fleet_info,
+                ["map_info"] = () => DBManager.Instance.Table.Map_info,
+                ["map_planet_info"] = () => DBManager.Instance.Table.Map_Planet_info,
+                ["map_route_info"] = () => DBManager.Instance.Table.Map_Route_info,
+                ["planet_info"] = () => DBManager.Instance.Table.Planet_info,
+                ["production_info"] = () => DBManager.Instance.Table.Production_info
             };
 
             // 초기 로드
             LoadTableList();
-        }
-
-        /// <summary>
-        /// DB에서 테이블 데이터 로드
-        /// </summary>
-        private void LoadTablesFromDB()
-        {
-            try
-            {
-                string connectionString = AppConfig.Instance.DatabaseConnectionString;
-                _dbTable.UpdateTable(connectionString);
-                Debug.WriteLine($"테이블 데이터 로드 완료");
-                Debug.WriteLine($"  - Fleet Info: {_dbTable.Fleet_info.Count}");
-                Debug.WriteLine($"  - Map Info: {_dbTable.Map_info.Count}");
-                Debug.WriteLine($"  - Map Planet Info: {_dbTable.Map_Planet_info.Count}");
-                Debug.WriteLine($"  - Map Route Info: {_dbTable.Map_Route_info.Count}");
-                Debug.WriteLine($"  - Planet Info: {_dbTable.Planet_info.Count}");
-                Debug.WriteLine($"  - Production Info: {_dbTable.Production_info.Count}");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"테이블 데이터 로드 실패: {ex.Message}");
-                _view.ShowError($"Failed to load tables from database:\n{ex.Message}");
-            }
         }
 
         /// <summary>
@@ -76,7 +49,7 @@ namespace ChatClientWPF.Presenters
             try
             {
                 Debug.WriteLine("=== Refresh Tables 클릭됨 ===");
-                LoadTablesFromDB();
+                DBManager.Instance.UpdateTable(AppConfig.Instance.DatabaseConnectionString);
                 LoadTableList();
                 _view.ShowInfo("Tables refreshed successfully.");
             }
@@ -167,3 +140,4 @@ namespace ChatClientWPF.Presenters
         }
     }
 }
+

@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MySql.Data" Version="9.4.0" />
     <ProjectReference Include="..\CommonLib\CommonLib.csproj" />
-    <ProjectReference Include="..\BaseServer\BaseServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>
