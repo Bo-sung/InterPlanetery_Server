@@ -13,7 +13,6 @@ namespace CommonLib.Commands
     public interface IGameCommand
     {
         public int PlayerId { get; }    // 누가 이 명령을 내렸는가?
-        public long TickNumber { get; } // 언제 이 명령이 실행되어야 하는가?
         public abstract GameCommandType Type { get; } // 이 명령은 어떤 종류인가?
     }
 
@@ -21,7 +20,6 @@ namespace CommonLib.Commands
     public abstract class Command : IGameCommand // IGameCommand를 구현하도록 변경
     {
         public int PlayerId { get; set; }
-        public long TickNumber { get; set; }
         public abstract GameCommandType Type { get; } // IGameCommand의 Type과 일치
 
         // GameWorld는 게임 상태를 관리하는 객체로, 실제 구현 시 해당 객체를 인자로 받습니다.

@@ -130,7 +130,7 @@ namespace BaseServer.Core.Game.Entities
                 return;
             }
 
-            IGameCommand command;
+            Command command;
             switch (commandType)
             {
                 case GameCommandType.ProduceFleet:
@@ -143,8 +143,9 @@ namespace BaseServer.Core.Game.Entities
                     return;
             }
 
-            if (clientSession.CurrentRoom != null)
+            if (clientSession?.CurrentRoom != null)
             {
+                long curTick = clientSession.CurrentRoom.GetGameCurrentTick();
                 await clientSession.CurrentRoom.AddCommand(command);
             }
         }

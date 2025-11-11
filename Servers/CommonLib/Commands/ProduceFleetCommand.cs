@@ -1,4 +1,4 @@
-using CommonLib;
+﻿using CommonLib;
 
 namespace CommonLib.Commands
 {

@@ -293,9 +293,14 @@ namespace BaseServer.Core.Game.Entities
         #endregion
 
         #region 게임 로직
-        public async Task AddCommand(IGameCommand command)
+        public async Task AddCommand(Command command)
         {
-            gameInstance.EnqueueCommand(command);
+            await gameInstance.EnqueueCommand(command);
+        }
+
+        public long GetGameCurrentTick()
+        {
+            return gameInstance.GetCurrentTick();
         }
         #endregion
 
