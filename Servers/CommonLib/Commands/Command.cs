@@ -21,8 +21,5 @@ namespace CommonLib.Commands
     {
         public int PlayerId { get; set; }
         public abstract GameCommandType Type { get; } // IGameCommand의 Type과 일치
-
-        // GameWorld는 게임 상태를 관리하는 객체로, 실제 구현 시 해당 객체를 인자로 받습니다.
-        public abstract void Execute(object gameWorld);
     }
 }

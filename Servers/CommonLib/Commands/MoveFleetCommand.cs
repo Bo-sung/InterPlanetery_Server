@@ -1,21 +1,20 @@
-using CommonLib;
+﻿using CommonLib;
 
 namespace CommonLib.Commands
 {
     // "함대 이동" 명령
     [Serializable]
-    public class MoveFleetCommand : IGameCommand
+    public class MoveFleetCommand : Command
     {
-        private int m_playerId;
         private long m_tick = 0;
         private int m_targetFleet;
         private int m_targetPlanetId;
 
-        public int PlayerId => m_playerId;
         public long TickNumber => m_tick;
-        GameCommandType IGameCommand.Type => GameCommandType.MoveFleet;
         public int TargetFleet => m_targetFleet;
         public int TargetPlanetId => m_targetPlanetId;
+
+        public override GameCommandType Type => GameCommandType.MoveFleet;
 
         public MoveFleetCommand(Protocol protocol)
         {

@@ -2,16 +2,15 @@
 
 namespace CommonLib.Commands
 {
-    public class ProduceFleetCommand : IGameCommand
+    public class ProduceFleetCommand : Command
     {
-        private int m_playerId;
         private long m_tick = 0;
         private int m_targetId;
 
-        public int PlayerId => m_playerId;
         public long TickNumber => m_tick;
-        GameCommandType IGameCommand.Type => GameCommandType.ProduceFleet;
         public int TargetId => m_targetId;
+
+        public override GameCommandType Type => GameCommandType.ProduceFleet;
 
         public ProduceFleetCommand(Protocol protocol)
         {
