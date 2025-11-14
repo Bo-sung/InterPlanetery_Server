@@ -8,13 +8,14 @@ using BaseServer.Core.Game.Session;
 using ProtocolType = CommonLib.ProtocolType;
 using System.Reflection.Emit;
 using MySqlX.XDevAPI;
+using BaseServer.Core.Game;
 
 namespace BaseServer.Core.Game.Entities
 {
     /// <summary>
-    /// 게임 플레이어 객체. 클라이언트 세션을 래핑하여 사용.
-    /// 대충 GamePlayer 라는 메카에 ClientSession이 탑승한 상태라 보면 됨.
-    /// </summary>
+    ﻿    /// 게임 플레이어 객체. 클라이언트 세션을 래핑하여 사용.
+    ﻿    /// 대충 GamePlayer 라는 메카에 ClientSession이 탑승한 상태라 보면 됨.
+    ﻿    /// </summary>
     public class GamePlayer
     {
         #region 상수
@@ -24,6 +25,7 @@ namespace BaseServer.Core.Game.Entities
 
         #region 세션 및 기본 필드
         protected ClientSession? clientSession;
+        private ICommandSender commandSender;
         protected int m_id = DEFAULT_ID;        // 유저 식별자
         protected string m_name = DEFAULT_NAME; // 유저 닉네임
         private bool m_isDefeated = false;
@@ -76,22 +78,28 @@ namespace BaseServer.Core.Game.Entities
         }
 
         #region 초기화 및 정리
-        public void Initilaize(ClientSession clientSession)
+        public void Initilaize(ClientSession clientSession, ICommandSender sender)
         {
             this.clientSession = clientSession;
+            this.commandSender = sender;
+
+            // 세션으로부터 플레이어 정보 설정
+            this.m_id = clientSession.UserInfo.UserId;
+            this.m_name = clientSession.UserInfo.UserName;
+
             RegistorProtos();
         }
 
         /// <summary>
-        /// 세션 빼기
+        /// 세션 분리 (플레이어 슬롯의 게임 데이터는 유지)
         /// </summary>
         public void Cleanup()
         {
-            this.clientSession = null;
-            m_id = DEFAULT_ID;
-            m_name = DEFAULT_NAME;
-
             UnRegistorProtos();
+
+            this.clientSession = null;
+            this.m_id = DEFAULT_ID;
+            this.m_name = DEFAULT_NAME;
         }
         #endregion
 
@@ -111,10 +119,10 @@ namespace BaseServer.Core.Game.Entities
         }
 
         /// <summary>
-        /// 카멘드 처리
-        /// </summary>
-        /// <param name="_protocol"></param>
-        /// <returns></returns>
+        ﻿/// 카멘드 처리
+        ﻿/// </summary>
+        ﻿/// <param name="_protocol"></param>
+        ﻿/// <returns></returns>
         private async Task HandleSubmitCommand(Protocol _protocol)
         {
             var commandTypeVal = _protocol.GetParam<int>("commandType");
@@ -143,10 +151,9 @@ namespace BaseServer.Core.Game.Entities
                     return;
             }
 
-            if (clientSession?.CurrentRoom != null)
+            if (commandSender != null)
             {
-                long curTick = clientSession.CurrentRoom.GetGameCurrentTick();
-                await clientSession.CurrentRoom.AddCommand(command);
+                await commandSender.SendCommandToGame(command);
             }
         }
         #endregion

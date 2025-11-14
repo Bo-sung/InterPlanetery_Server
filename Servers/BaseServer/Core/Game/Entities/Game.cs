@@ -1,641 +1,742 @@
 ﻿using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
 using BaseServer.Database;
-using CommonLib.Commands; // IGameCommand
-using CommonLib.TableData; // MapData, Planet
+using CommonLib.Commands;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace BaseServer.Core.Game.Entities
 {
-    public class FleetController
-    {
-        private int nextInstanceId = 0; 
-
-        public int GetNextFleetId()
-        {
-            if (nextInstanceId == int.MaxValue)
-            {
-                nextInstanceId = 0;
-                while (fleets.Keys.Contains(nextInstanceId))
-                {
-                    nextInstanceId++;
-                }
-                return nextInstanceId;
-            }
-            return nextInstanceId++; 
-        }
-        private Dictionary<int, Fleet> fleets = new Dictionary<int, Fleet>();
-
-        public void AddFleet(Fleet fleet)
-        {
-            if (fleet == null)
-            {
-                Console.WriteLine($"[Game][FleetController] Fleet is null:");
-                return;
-            }
-
-            fleets.Add(fleet.ID, fleet);
-            Console.WriteLine($"Fleet {fleet.ID} added to FleetController");
-        }
-
-        public Fleet GetFleet(int fleetId)
-        {
-            return fleets.TryGetValue(fleetId, out Fleet fleet) ? fleet : null;
-        }
-
-        public void RemoveFleet(Fleet fleet)
-        {
-            if (fleet == null)
-            {
-                Console.WriteLine($"[Game][FleetController] Fleet is null:");
-                return;
-            }
-            int fleetid = fleet.ID;
-            fleets.Remove(fleetid);
-            Console.WriteLine($"Fleet {fleetid} removed from FleetController");
-        }
-    }
-
-    public class Fleet
-    {
-        private int _insctanceId;
-        public int ID => _insctanceId;
-        private FleetInfoData data;
-        public FleetInfoData Data => data;
-
-        public Fleet(FleetInfoData data)
-        {
-            this.data = data;
-        }
-
-        public void SetID(int id)
-        {
-            this._insctanceId = id;
-        }
-    }
-
-    public class ProduceController
-    {
-        // 생산 중인 함대 정보 (PlayerId -> 생산 중인 Fleet 리스트)
-        private Dictionary<int, List<ProductionInfo>> productionQueue = new Dictionary<int, List<ProductionInfo>>();
-
-        private DB_Table _db;
-        private FleetController fleetController;
-
-        public ProduceController(DBManager db, FleetController fleetController)
-        {
-            _db = db.Table;
-            this.fleetController = fleetController;
-        }
-
-        // 생산 요청 처리
-        public void RequestProcess(ProductionInfoData command, int playerId)
-        {
-            // 플레이어의 생산 큐가 없으면 생성
-            if (!productionQueue.ContainsKey(playerId))
-            {
-                productionQueue[playerId] = new List<ProductionInfo>();
-            }
-
-            FleetInfoData fleetData = GetFleetDataFromDB(command.Targetid);
-            if (fleetData == null)
-            {
-                Console.WriteLine($"ProductionInfoData not found: {command.Targetid}");
-                return;
-            }
-
-            ProductionInfo production = new ProductionInfo
-            {
-                PlayerId = playerId,
-                Fleet = new Fleet(fleetData),
-                StartTime = DateTime.Now,
-                ProductionTime = command.ProductionTime,
-                RemainingTime = command.ProductionTime
-            };
-
-            productionQueue[playerId].Add(production);
-            Console.WriteLine($"Player {playerId} started producing fleet {production.Fleet.ID}");
-        }
-
-        // 매 틱마다 호출되어 생산 상태 업데이트
-        public void HandleUpdateLoop(float deltaTime)
-        {
-            foreach (var kvp in productionQueue)
-            {
-                int playerId = kvp.Key;
-                List<ProductionInfo> productions = kvp.Value;
-
-                // 완료된 생산 목록
-                List<ProductionInfo> completedProductions = new List<ProductionInfo>();
-
-                // 각 생산 항목의 남은 시간 감소
-                foreach (var production in productions)
-                {
-                    production.RemainingTime -= deltaTime;
-
-                    // 생산 완료 체크
-                    if (production.RemainingTime <= 0)
-                    {
-                        completedProductions.Add(production);
-                    }
-                }
-
-                // 완료된 생산 처리
-                foreach (var completed in completedProductions)
-                {
-                    HandleProduceComplete(completed);
-                    productions.Remove(completed);
-                }
-            }
-        }
-
-        // 생산 완료 처리
-        private void HandleProduceComplete(ProductionInfo production)
-        {
-            Console.WriteLine($"Fleet {production.Fleet.ID} production completed for player {production.PlayerId}");
-
-            // FleetController로 완성된 Fleet 전달
-            fleetController.AddFleet(production.Fleet);
-
-            // DB에 생산 완료 기록 (필요시)
-            SaveProductionToDB(production);
-        }
-
-        // DB에서 함대 데이터 가져오기
-        private ProductionInfoData GetProductionInfoDataFromDB(int fleetType)
-        {
-            if(_db.Production_info.ContainsKey(fleetType))
-                return _db.Production_info[fleetType];
-
-            return null;
-        }
-
-        // DB에서 함대 데이터 가져오기
-        private FleetInfoData GetFleetDataFromDB(int fleetType)
-        {
-            if (_db.Fleet_info.ContainsKey(fleetType))
-                return _db.Fleet_info[fleetType];
-
-            return null;
-        }
-
-        // DB에 생산 완료 기록
-        private void SaveProductionToDB(ProductionInfo production)
-        {
-            // DB에 생산 완료 정보 저장
-        }
-
-        // 플레이어의 현재 생산 목록 조회
-        public List<ProductionInfo> GetPlayerProductions(int playerId)
-        {
-            return productionQueue.TryGetValue(playerId, out var productions)
-                ? new List<ProductionInfo>(productions)
-                : new List<ProductionInfo>();
-        }
-    }
-
-    // 생산 정보 클래스
-    public class ProductionInfo
-    {
-        public int PlayerId { get; set; }
-        public Fleet Fleet { get; set; }
-        public DateTime StartTime { get; set; }
-        public float ProductionTime { get; set; }  // 총 생산 시간 (초)
-        public float RemainingTime { get; set; }   // 남은 생산 시간 (초)
-
-        public float Progress => 1f - (RemainingTime / ProductionTime);
-    }
-    public class Game
+    /// <summary>
+    /// 게임 인스턴스 클래스
+    /// - 고정 틱 레이트(20 TPS)로 동작하는 게임 루프 관리
+    /// - 최대 2명의 플레이어 지원
+    /// - 명령 큐 기반의 결정론적 게임 시뮬레이션
+    /// </summary>
+    public class Game : IDisposable
     {
         #region 상수
+        // 플레이어 관련 상수
         public const int MAX_PLAYERS = 2;
+        public const int PLAYER_FACTION_1 = 1;      // 플레이어 1 진영
+        public const int PLAYER_FACTION_2 = -1;     // 플레이어 2 진영
+        public const int PLAYER_FACTION_NONE = 0;   // 중립 진영
 
-        public const int PLAYER_FACTION_1 = 1;
-        public const int PLAYER_FACTION_2 = -1;
-        public const int PLAYER_FACTION_NONE = 0;
+        // 게임 상태 상수
+        private const int GAMESTATE_WAITING = 0;    // 대기 중 (플레이어 입장 대기)
+        private const int GAMESTATE_RUNNING = 1;    // 게임 진행 중
+        private const int GAMESTATE_ENDED = 2;      // 게임 종료
 
-        const int GAMESTATE_WAITING = 0;
-        const int GAMESTATE_RUNNING = 1;
-        const int GAMESTATE_ENDED = 2;
+        // 틱 관련 상수
+        public const float FIXED_TICK_RATE = 0.05f; // 50ms (20 TPS = Ticks Per Second)
+        private const int COMMAND_BUFFER_TICKS = 3; // 명령을 미래 3틱 후에 실행 (네트워크 지연 보상)
+        private const int COMMAND_HISTORY_LIMIT = 100; // 처리된 틱 히스토리 최대 보관 개수
 
-        public const float FIXED_TICK_RATE = 0.05f; // 50ms
-
-        // 커맨드 버퍼링을 위한 상수
-        private const int COMMAND_BUFFER_TICKS = 3; // 미래에 명령을 등록할 틱 수
-        private const int COMMAND_HISTORY_LIMIT = 100; // 처리된 틱 이력 제한
+        // 업데이트 주기 상수
+        private const int RESOURCE_UPDATE_INTERVAL = 4;  // 4틱마다 자원 생산 (200ms)
+        private const int WIN_CHECK_INTERVAL = 10;       // 10틱마다 승리 조건 체크 (500ms)
         #endregion
 
         #region 필드
-        private object m_lock_command = new object();
-        private int gameState = 0;              // 0: 대기, 1: 진행 중, 2: 종료
-        private bool mInCombat = false;
-        private long m_StartTime = 0;           // 게임 시작 시간 (Unix 밀리초)
-        private Dictionary<long, List<Command>> m_dic_Commands = new Dictionary<long, List<Command>>();
-        private GameMap _gameMap;               // GameMap 객체로 맵 관련 데이터와 로직 위임
-        private MapManager _mapService;
-        private DBManager _dbManager;
-        private ProduceController produceController;
-        private FleetController fleetController;
-        protected GamePlayer[] players = new GamePlayer[MAX_PLAYERS];
-        private long _tickCount;
+        // 동기화 객체
+        private readonly SemaphoreSlim m_commandSemaphore = new SemaphoreSlim(1, 1); // 명령 큐 접근 동기화
 
-        // 틱 처리 상태 추적
-        private HashSet<long> _processedTicks = new HashSet<long>();
+        // 게임 상태
+        private int m_gameState = GAMESTATE_WAITING;    // 현재 게임 상태
+        private bool m_inCombat = false;                // 전투 중인지 여부
+        private long m_startTime = 0;                   // 게임 시작 시간 (Unix 밀리초)
+        private long m_tickCount = 0;                   // 현재 틱 카운터 (게임 시작부터 누적)
+        private bool m_disposed = false;                // Dispose 호출 여부
 
-        // 세마포어 추가
-        private readonly SemaphoreSlim m_semaphore_command = new SemaphoreSlim(1, 1);
+        // 명령 관리
+        private Dictionary<long, List<Command>> m_commandQueue = new Dictionary<long, List<Command>>();
+        // Key: 틱 번호, Value: 해당 틱에 실행될 명령 리스트
+
+        private HashSet<long> m_processedTicks = new HashSet<long>();
+        // 이미 처리된 틱 번호들 (중복 처리 방지용)
+
+        // 게임 시스템 컴포넌트
+        private GameMap? m_gameMap;                         // 게임 맵 (행성, 경로 정보)
+        private readonly MapManager m_mapManager;           // 맵 데이터 로더
+        private readonly DBManager m_dbManager;             // 데이터베이스 매니저
+        private readonly ProduceController m_produceController;  // 함대 생산 컨트롤러
+        private readonly FleetController m_fleetController;      // 함대 이동/전투 컨트롤러
+        private readonly GamePlayer[] m_players = new GamePlayer[MAX_PLAYERS]; // 플레이어 배열
+
+        // 게임 루프 제어
+        private CancellationTokenSource? m_gameLoopCts;     // 게임 루프 취소 토큰
+        #endregion
+
+        #region 프로퍼티
+        /// <summary>게임이 실행 중인지 여부</summary>
+        public bool IsRunning => m_gameState == GAMESTATE_RUNNING;
+
+        /// <summary>게임이 종료되었는지 여부</summary>
+        public bool IsEnded => m_gameState == GAMESTATE_ENDED;
+
+        /// <summary>현재 틱 번호</summary>
+        public long CurrentTick => m_tickCount;
         #endregion
 
         #region 생성자
+        /// <summary>
+        /// Game 인스턴스 생성자
+        /// - 싱글톤 매니저들 초기화
+        /// - 컨트롤러 생성
+        /// - 플레이어 슬롯 사전 생성
+        /// </summary>
         public Game()
         {
-            _dbManager = DBManager.Instance;
-            _mapService = MapManager.Instance;
-            fleetController = new FleetController();
-            produceController = new ProduceController(_dbManager, fleetController);
+            // 싱글톤 매니저 인스턴스 가져오기
+            m_dbManager = DBManager.Instance;
+            m_mapManager = MapManager.Instance;
+
+            // 게임 컨트롤러 생성
+            m_fleetController = new FleetController();
+            m_produceController = new ProduceController(m_dbManager, m_fleetController);
+
+            // 플레이어 슬롯 미리 생성 (최대 2명)
+            for (int i = 0; i < MAX_PLAYERS; i++)
+            {
+                m_players[i] = new GamePlayer();
+            }
+
+            Console.WriteLine("[Game] Game instance created");
         }
         #endregion
 
         #region 커맨드 관리
+        /// <summary>
+        /// 명령을 게임 큐에 추가
+        /// - 명령은 현재 틱 + COMMAND_BUFFER_TICKS 후에 실행됨
+        /// - 네트워크 지연을 보상하기 위한 버퍼링 메커니즘
+        /// </summary>
+        /// <param name="command">실행할 명령</param>
         public async Task EnqueueCommand(Command command)
         {
+            // null 체크
             if (command == null)
+            {
+                Console.WriteLine("[Game] Cannot enqueue null command");
                 return;
-            await AsyncEnqueueCommand(command);
+            }
+
+            // 게임이 실행 중인지 확인
+            if (m_gameState != GAMESTATE_RUNNING)
+            {
+                Console.WriteLine($"[Game] Cannot enqueue command - game not running (state: {m_gameState})");
+                return;
+            }
+
+            await EnqueueCommandInternal(command);
         }
 
-        private async Task AsyncEnqueueCommand(Command command)
+        /// <summary>
+        /// 명령 큐에 명령 추가 (내부 구현)
+        /// - Thread-safe하게 명령 큐에 추가
+        /// - 이미 처리된 틱이면 다음 틱으로 자동 이동
+        /// </summary>
+        private async Task EnqueueCommandInternal(Command command)
         {
-            if (command == null)
-                return;
-
-            // 비동기적으로 세마포어 획득 시도
-            await m_semaphore_command.WaitAsync();
+            // 세마포어로 명령 큐 접근 동기화
+            await m_commandSemaphore.WaitAsync();
             try
             {
+                // 현재 틱 계산
                 long currentTick = GetCurrentTick();
 
-                // 미래 틱 계산 (현재 + 버퍼)
+                // 목표 틱 = 현재 틱 + 버퍼 (네트워크 지연 보상)
                 long targetTick = currentTick + COMMAND_BUFFER_TICKS;
 
-                // 이미 처리된 틱인지 확인
-                if (_processedTicks.Contains(targetTick))
+                // 이미 처리된 틱이면 다음 틱으로 이동
+                // (지연된 명령이 과거 틱에 등록되는 것을 방지)
+                while (m_processedTicks.Contains(targetTick))
                 {
-                    // 이미 처리된 틱이면 추가 버퍼링
                     targetTick++;
-                    Console.WriteLine($"[Game] Target tick already processed, registering for next tick: {targetTick}");
                 }
 
-                if (!m_dic_Commands.ContainsKey(targetTick))
-                    m_dic_Commands.Add(targetTick, new List<Command>());
+                // 해당 틱의 명령 리스트가 없으면 생성
+                if (!m_commandQueue.ContainsKey(targetTick))
+                {
+                    m_commandQueue[targetTick] = new List<Command>();
+                }
 
-                m_dic_Commands[targetTick].Add(command);
+                // 명령 추가
+                m_commandQueue[targetTick].Add(command);
 
-                // 로그 추가
-                Console.WriteLine($"[Game] Command registered for tick {targetTick} (current: {currentTick})");
+                Console.WriteLine($"[Game] Command queued for tick {targetTick} " +
+                    $"(Type: {command.Type}, Player: {command.PlayerId}, Current: {currentTick})");
             }
             finally
             {
-                m_semaphore_command.Release();
+                // 세마포어 해제
+                m_commandSemaphore.Release();
             }
         }
         #endregion
 
         #region 플레이어 관리
-        public void UserJoin(ClientSession player)
+        /// <summary>
+        /// 플레이어를 게임에 추가
+        /// - 빈 슬롯을 찾아 플레이어 세션 연결
+        /// - 최대 2명까지 입장 가능
+        /// </summary>
+        /// <param name="session">클라이언트 세션</param>
+        /// <param name="commandSender">명령 전송 인터페이스</param>
+        /// <returns>입장 성공 여부</returns>
+        public bool UserJoin(ClientSession session, ICommandSender commandSender)
         {
-            for (int i = 0; i < MAX_PLAYERS; i++)
+            // null 체크
+            if (session == null || commandSender == null)
             {
-                if (players[i] != null)
-                    continue;
-
-                // 새 GamePlayer 객체 생성 후 초기화
-                players[i] = new GamePlayer();
-                players[i].Initilaize(player);
-
-                Console.WriteLine($"[Game] Player joined at slot {i}");
-                return; // 플레이어 추가 완료 후 메서드 종료
+                Console.WriteLine("[Game] Cannot join - null session or command sender");
+                return false;
             }
 
-            // 모든 슬롯이 차 있을 경우
-            Console.WriteLine("[Game] Cannot join: game is full");
-        }
-
-        public void UserLeave(ClientSession player)
-        {
+            // 빈 슬롯 찾기
             for (int i = 0; i < MAX_PLAYERS; i++)
             {
-                // 플레이어가 null 이 아니고. 입력받은 유저와 같을때 null로 변경
-                if (players[i] != null && players[i].Equals(player))
+                // 슬롯이 비어있으면 (IsValid == false)
+                if (m_players[i] != null && !m_players[i].IsValid)
                 {
-                    players[i].Cleanup();
-                    players[i] = null;
-                    Console.WriteLine($"[Game] Player left from slot {i}");
-                    break;
+                    // 플레이어 초기화 및 세션 연결
+                    m_players[i].Initilaize(session, commandSender);
+                    Console.WriteLine($"[Game] Player {session.SessionId} joined at slot {i}");
+                    return true;
                 }
             }
+
+            // 모든 슬롯이 찼을 경우
+            Console.WriteLine("[Game] Cannot join - game is full");
+            return false;
+        }
+
+        /// <summary>
+        /// 플레이어를 게임에서 제거
+        /// - 세션을 찾아 해당 슬롯 정리
+        /// </summary>
+        /// <param name="session">제거할 플레이어 세션</param>
+        /// <returns>제거 성공 여부</returns>
+        public bool UserLeave(ClientSession session)
+        {
+            if (session == null)
+                return false;
+
+            // 해당 세션을 가진 플레이어 찾기
+            for (int i = 0; i < MAX_PLAYERS; i++)
+            {
+                if (m_players[i] != null && m_players[i].Session == session)
+                {
+                    // 플레이어 슬롯 정리
+                    m_players[i].Cleanup();
+                    Console.WriteLine($"[Game] Player {session.SessionId} left from slot {i}");
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 현재 유효한 플레이어 수 반환
+        /// </summary>
+        private int GetValidPlayerCount()
+        {
+            return m_players.Count(p => p != null && p.IsValid);
         }
         #endregion
 
         #region 게임 초기화 및 루프
-        public async Task StartGame(int mapIndex = 0)
+        /// <summary>
+        /// 게임 시작
+        /// - 맵 데이터 로드
+        /// - 컨트롤러 초기화
+        /// - 게임 루프 시작
+        /// </summary>
+        /// <param name="mapIndex">로드할 맵 인덱스</param>
+        /// <returns>시작 성공 여부</returns>
+        public async Task<bool> StartGame(int mapIndex = 0)
         {
-            // 게임 시작 로직 구현
-
-            // 맵 데이터 로드
-            MapData staticMapData = _mapService.LoadMapData(mapIndex);
-            if (staticMapData == null)
+            // 게임 상태 확인 (WAITING 상태에서만 시작 가능)
+            if (m_gameState != GAMESTATE_WAITING)
             {
-                Console.WriteLine("[Game] Invalid map index.");
-                return;
+                Console.WriteLine($"[Game] Cannot start - invalid state: {m_gameState}");
+                return false;
             }
 
-            // GameMap 객체 생성 및 초기화
-            _gameMap = new GameMap(staticMapData);
+            // 맵 데이터 로드
+            MapData? staticMapData = m_mapManager.LoadMapData(mapIndex);
+            if (staticMapData == null)
+            {
+                Console.WriteLine($"[Game] Failed to load map data (index: {mapIndex})");
+                return false;
+            }
 
-            // 게임 상태 설정
-            gameState = GAMESTATE_RUNNING;
-            m_StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // GameMap 객체 생성 (행성, 경로 정보 초기화)
+            m_gameMap = new GameMap(staticMapData);
 
-            // 처리된 틱 초기화
-            _processedTicks.Clear();
+            // FleetController에 맵 정보 전달
+            m_fleetController.InitController(m_gameMap);
 
-            // 게임 루프 시작
-            await GameLoop();
+            // 게임 상태 초기화
+            m_gameState = GAMESTATE_RUNNING;                              // 게임 실행 상태로 변경
+            m_startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); // 시작 시간 기록
+            m_tickCount = 0;                                              // 틱 카운터 초기화
+            m_processedTicks.Clear();                                     // 처리된 틱 히스토리 초기화
+            m_gameLoopCts = new CancellationTokenSource();                // 게임 루프 취소 토큰 생성
+
+            Console.WriteLine($"[Game] Game started with map {mapIndex}");
+
+            // 게임 루프를 별도 Task로 시작 (비동기 실행)
+            _ = Task.Run(() => GameLoop(m_gameLoopCts.Token));
+
+            return true;
         }
 
-        /*
-         * 고정 틱 레이트: 20 TPS (50ms/틱)
-         * deltaTime : 항상 0.05초로 고정
-         * 틱 카운터 : 게임 시작부터 누적
-         */
-        async Task GameLoop()
+        /// <summary>
+        /// 게임 메인 루프
+        /// - 고정 틱 레이트(20 TPS)로 동작
+        /// - 각 틱마다 게임 상태 업데이트
+        /// - 정확한 타이밍 제어를 위한 대기 시간 계산
+        /// </summary>
+        /// <param name="cancellationToken">취소 토큰</param>
+        private async Task GameLoop(CancellationToken cancellationToken)
         {
-            // 틱 레이트 설정 및 초기화
-            float deltaTime = FIXED_TICK_RATE;
-            _tickCount = 0;
-            Console.WriteLine("[Game] Game started.");
+            const float deltaTime = FIXED_TICK_RATE; // 고정 델타타임 (50ms)
+
+            Console.WriteLine("[Game] Game loop started");
 
             try
             {
-                // 게임 루프
-                while (gameState != GAMESTATE_ENDED)
+                // 게임이 실행 중이고 취소되지 않았으면 계속 루프
+                while (m_gameState == GAMESTATE_RUNNING && !cancellationToken.IsCancellationRequested)
                 {
-                    // 만약 gameState가 대기 상태라면, 대기
-                    if (gameState == GAMESTATE_WAITING)
-                    {
-                        await Task.Delay(100); // 100ms 대기
-                        continue;
-                    }
+                    var tickStartTime = DateTime.UtcNow; // 틱 시작 시간 기록
 
-                    var tickStartTime = DateTime.UtcNow;
-                    // 게임 상태 업데이트
-                    UpdateGameState(deltaTime, _tickCount);
-                    _tickCount++;
+                    // === 게임 상태 업데이트 (핵심 로직) ===
+                    UpdateGameState(deltaTime, m_tickCount);
+                    m_tickCount++; // 틱 카운터 증가
 
-                    // 다음 틱까지 대기
-                    var tickEndTime = DateTime.UtcNow;
-                    var elapsed = (tickEndTime - tickStartTime).TotalSeconds;
-                    var delay = deltaTime - elapsed;
+                    // === 다음 틱까지 정확한 대기 시간 계산 ===
+                    var tickEndTime = DateTime.UtcNow; // 틱 종료 시간
+                    var elapsed = (tickEndTime - tickStartTime).TotalSeconds; // 실제 소요 시간
+                    var delay = deltaTime - elapsed; // 다음 틱까지 남은 시간
+
                     if (delay > 0)
-                        await Task.Delay(TimeSpan.FromSeconds(delay));
+                    {
+                        // 남은 시간이 있으면 대기
+                        await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
+                    }
+                    else if (delay < -0.01) // 10ms 이상 지연되면 경고
+                    {
+                        // 틱 처리가 목표 시간보다 오래 걸린 경우
+                        Console.WriteLine($"[Game] Tick {m_tickCount} lagging: {-delay * 1000:F2}ms behind");
+                    }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // 게임 루프가 취소된 경우 (정상 종료)
+                Console.WriteLine("[Game] Game loop cancelled");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Game] Error in game loop: {ex.Message}");
+                // 예상치 못한 예외 발생 (비정상 종료)
+                Console.WriteLine($"[Game] Fatal error in game loop: {ex.Message}\n{ex.StackTrace}");
+                m_gameState = GAMESTATE_ENDED;
             }
             finally
             {
-                // 게임 종료 시 리소스 정리
+                // 게임 루프 종료 시 리소스 정리
+                Console.WriteLine("[Game] Game loop ended");
                 Cleanup();
             }
         }
 
-        // 경과 시간(밀리초) 계산
+        /// <summary>
+        /// 게임 시작 이후 경과 시간 계산
+        /// </summary>
+        /// <returns>경과 시간 (밀리초)</returns>
         public long GetElapsedTime()
         {
+            if (m_startTime == 0)
+                return 0;
+
             long currentTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            return currentTimeMs - m_StartTime;
+            return currentTimeMs - m_startTime;
         }
 
-        // 현재 틱을 계산하는 메서드
+        /// <summary>
+        /// 현재 틱 번호 계산
+        /// - 경과 시간을 틱 레이트로 나누어 계산
+        /// </summary>
+        /// <returns>현재 틱 번호</returns>
         public long GetCurrentTick()
         {
             long elapsedTimeMs = GetElapsedTime();
             return elapsedTimeMs / (long)(FIXED_TICK_RATE * 1000);
         }
 
-        public void UpdateGameState(float deltaTime, long tickCount)
+        /// <summary>
+        /// 게임 상태 업데이트 (매 틱마다 호출)
+        /// - 명령 처리
+        /// - 각 시스템 업데이트 (생산, 이동, 전투, 점령)
+        /// - 승리 조건 체크
+        /// - 클라이언트에게 상태 브로드캐스트
+        /// </summary>
+        /// <param name="deltaTime">고정 델타타임 (50ms)</param>
+        /// <param name="tickCount">현재 틱 번호</param>
+        private void UpdateGameState(float deltaTime, long tickCount)
         {
-            // 현재 틱 기반 처리 추가
             long currentTick = GetCurrentTick();
 
-            // 현재 틱을 처리된 것으로 표시
-            lock (m_lock_command)
-            {
-                _processedTicks.Add(currentTick);
+            // 현재 틱을 처리된 것으로 표시 및 오래된 히스토리 정리
+            MarkTickProcessed(currentTick);
 
-                // 메모리 관리를 위해 오래된 처리 이력 정리
-                if (_processedTicks.Count > COMMAND_HISTORY_LIMIT)
-                {
-                    _processedTicks.RemoveWhere(tick => tick < currentTick - (COMMAND_HISTORY_LIMIT / 2));
-                }
-            }
+            // === 각 시스템 순차 업데이트 ===
 
+            // 1. 명령 처리 (플레이어 입력 처리)
             CommandProcess(currentTick);
-            if (currentTick % 4 == 0)  // 200ms마다 실행
+
+            // 2. 자원 생산 (4틱마다 = 200ms)
+            if (currentTick % RESOURCE_UPDATE_INTERVAL == 0)
             {
                 ResourceProduction(currentTick);
             }
+
+            // 3. 함대 생산 처리
             ProductionProcess(currentTick);
+
+            // 4. 함대 이동 처리
             MovementProcess(currentTick);
 
-            if (mInCombat)
+            // 5. 전투 처리 (전투 중일 때만)
+            if (m_inCombat)
             {
                 CombatProcess(currentTick);
             }
+
+            // 6. 행성 점령 처리
             ConquerProcess(currentTick);
 
-            if (currentTick % 10 == 0) // 500ms마다 실행
+            // 7. 승리 조건 체크 (10틱마다 = 500ms)
+            if (currentTick % WIN_CHECK_INTERVAL == 0)
             {
                 CheckWinCondition(currentTick);
-                if (gameState == GAMESTATE_ENDED)
-                {
-                    Console.WriteLine("[Game] Game ended.");
-                    return;
-                }
             }
 
+            // 8. 게임 상태를 클라이언트에게 브로드캐스트
             BroadcastEvent(currentTick);
         }
 
-        // 게임 정리 메서드 추가
-        public void Cleanup()
+        /// <summary>
+        /// 현재 틱을 처리된 것으로 표시
+        /// - 중복 처리 방지
+        /// - 오래된 틱 히스토리 정리 (메모리 관리)
+        /// </summary>
+        private void MarkTickProcessed(long currentTick)
         {
-            // 게임 상태를 종료로 설정
-            gameState = GAMESTATE_ENDED;
-
-            // 플레이어 정리
-            for (int i = 0; i < MAX_PLAYERS; i++)
+            lock (m_commandSemaphore)
             {
-                if (players[i] != null)
+                // 현재 틱을 처리된 것으로 추가
+                m_processedTicks.Add(currentTick);
+
+                // 메모리 관리: 히스토리가 너무 많이 쌓이면 오래된 것 삭제
+                if (m_processedTicks.Count > COMMAND_HISTORY_LIMIT)
                 {
-                    players[i].Cleanup();
-                    players[i] = null;
+                    long threshold = currentTick - (COMMAND_HISTORY_LIMIT / 2);
+                    m_processedTicks.RemoveWhere(tick => tick < threshold);
                 }
             }
+        }
 
-            // 명령 큐 정리
-            lock (m_lock_command)
+        /// <summary>
+        /// 게임 중지 요청
+        /// - 게임 루프를 취소하고 종료 상태로 변경
+        /// </summary>
+        public void StopGame()
+        {
+            if (m_gameState == GAMESTATE_ENDED)
+                return;
+
+            Console.WriteLine("[Game] Stopping game...");
+            m_gameState = GAMESTATE_ENDED;
+            m_gameLoopCts?.Cancel(); // 게임 루프 취소
+        }
+
+        /// <summary>
+        /// 게임 리소스 정리
+        /// - 플레이어 세션 정리
+        /// - 명령 큐 정리
+        /// - 맵 정리
+        /// </summary>
+        private void Cleanup()
+        {
+            Console.WriteLine("[Game] Cleaning up resources...");
+
+            // 게임 상태 종료
+            m_gameState = GAMESTATE_ENDED;
+
+            // 모든 플레이어 정리
+            for (int i = 0; i < MAX_PLAYERS; i++)
             {
-                m_dic_Commands.Clear();
-                _processedTicks.Clear();
+                m_players[i]?.Cleanup();
             }
 
-            // SemaphoreSlim 해제
-            m_semaphore_command.Dispose();
+            // 명령 큐 정리 (thread-safe)
+            lock (m_commandSemaphore)
+            {
+                m_commandQueue.Clear();
+                m_processedTicks.Clear();
+            }
 
             // 맵 정리
-            if (_gameMap != null)
-            {
-                _gameMap = null;
-            }
+            m_gameMap = null;
 
-            Console.WriteLine("[Game] Resources cleaned up");
+            Console.WriteLine("[Game] Cleanup completed");
         }
         #endregion
 
         #region 게임 시스템 프로세스
         /// <summary>
-        /// 커맨드 처리
+        /// 명령 처리 시스템
+        /// - 현재 틱에 등록된 명령들을 가져와 실행
+        /// - Thread-safe하게 명령 큐에서 꺼내기
         /// </summary>
-        void CommandProcess(long currentTick)
+        /// <param name="currentTick">현재 틱 번호</param>
+        private void CommandProcess(long currentTick)
         {
-            List<Command> tickCommands = new List<Command>();
+            List<Command>? tickCommands = null;
 
-            // 스레드 안전하게 명령 가져오기
-            lock (m_lock_command)
+            // 명령 큐에서 현재 틱의 명령들 가져오기 (thread-safe)
+            lock (m_commandSemaphore)
             {
-                if (m_dic_Commands.ContainsKey(currentTick))
+                if (m_commandQueue.TryGetValue(currentTick, out var commands))
                 {
-                    tickCommands.AddRange(m_dic_Commands[currentTick]);
-                    m_dic_Commands.Remove(currentTick);
+                    tickCommands = new List<Command>(commands); // 복사본 생성
+                    m_commandQueue.Remove(currentTick); // 큐에서 제거
                 }
             }
 
-            // 명령 실행
+            // 명령이 없으면 조기 반환
+            if (tickCommands == null || tickCommands.Count == 0)
+                return;
+
+            // 모든 명령 순차 실행
             foreach (Command command in tickCommands)
             {
-                try
+                ExecuteCommand(command);
+            }
+        }
+
+        /// <summary>
+        /// 명령 실행 (타입별 분기)
+        /// - 명령 타입에 따라 적절한 핸들러 호출
+        /// - 예외 발생 시 로그 출력 후 계속 진행
+        /// </summary>
+        /// <param name="command">실행할 명령</param>
+        private void ExecuteCommand(Command command)
+        {
+            try
+            {
+                // 명령 타입별 분기
+                switch (command.Type)
                 {
-                    switch(command.Type)
-                    {
-                        case CommonLib.Commands.GameCommandType.MoveFleet:
-                            {
-                                if(command is not MoveFleetCommand)
-                                    throw new Exception("command Type Error. command is not MoveFleetCommand!!");
+                    case CommonLib.Commands.GameCommandType.MoveFleet:
+                        // 함대 이동 명령 처리
+                        HandleMoveFleetCommand(command);
+                        break;
 
-                                var mvfcommand = (MoveFleetCommand)command;
-                            }break;
-                        case CommonLib.Commands.GameCommandType.ProduceFleet:
-                            {
-                                if (command is not ProduceFleetCommand)
-                                    throw new Exception("command Type Error. command is not ProduceFleetCommand!!");
+                    case CommonLib.Commands.GameCommandType.ProduceFleet:
+                        // 함대 생산 명령 처리
+                        HandleProduceFleetCommand(command);
+                        break;
 
-                                var pdfcommand = (ProduceFleetCommand)command;
-                                int playerId = command.PlayerId;
-                                if(_dbManager.Table.Production_info.ContainsKey(pdfcommand.TargetId))
-                                    throw new Exception("command Type Error. command is not ProduceFleetCommand!!");
-
-                                var produceFleetData = _dbManager.Table.Production_info[pdfcommand.TargetId];
-                                produceController.RequestProcess(produceFleetData, playerId);
-                            }
-                            break;
-                    }
-
-                    // 디버깅용 로그
-                    Console.WriteLine($"[Game] Command executed: {command.GetType().Name}");
-                }
-                catch (Exception ex)
-                {
-                    // 명령 실행 중 예외 처리
-                    Console.WriteLine($"[Game] Error executing command: {ex.Message}");
+                    default:
+                        // 알 수 없는 명령 타입
+                        Console.WriteLine($"[Game] Unknown command type: {command.Type}");
+                        break;
                 }
             }
+            catch (Exception ex)
+            {
+                // 명령 실행 중 예외 발생 시 로그 출력
+                // 한 명령의 실패가 전체 게임을 멈추지 않도록 함
+                Console.WriteLine($"[Game] Error executing command (Type: {command.Type}, Player: {command.PlayerId}): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 함대 이동 명령 처리
+        /// - 명령 타입 검증
+        /// - FleetController에게 이동 요청
+        /// </summary>
+        private void HandleMoveFleetCommand(Command command)
+        {
+            // 타입 캐스팅 및 검증
+            if (command is not MoveFleetCommand moveCommand)
+            {
+                Console.WriteLine($"[Game] Invalid MoveFleetCommand");
+                return;
+            }
+
+            // 이동 명령 실행
+            Console.WriteLine($"[Game] Move fleet command: Player {moveCommand.PlayerId}, " +
+                $"Fleet {moveCommand.FleetId} -> Planet {moveCommand.TargetPlanetId}");
+
+            // TODO: FleetController에게 실제 이동 명령 전달
+            // m_fleetController.CommandMove(moveCommand.FleetId, moveCommand.TargetPlanetId);
+        }
+
+        /// <summary>
+        /// 함대 생산 명령 처리
+        /// - 명령 타입 검증
+        /// - DB에서 생산 정보 조회
+        /// - ProduceController에게 생산 요청
+        /// </summary>
+        private void HandleProduceFleetCommand(Command command)
+        {
+            // 타입 캐스팅 및 검증
+            if (command is not ProduceFleetCommand produceCommand)
+            {
+                Console.WriteLine($"[Game] Invalid ProduceFleetCommand");
+                return;
+            }
+
+            int playerId = command.PlayerId;
+            int targetId = produceCommand.TargetId;
+
+            // DB에서 생산 정보 조회
+            if (!m_dbManager.Table.Production_info.TryGetValue(targetId, out var produceFleetData))
+            {
+                Console.WriteLine($"[Game] Invalid production target ID: {targetId}");
+                return;
+            }
+
+            // 생산 컨트롤러에게 생산 요청
+            m_produceController.RequestProcess(produceFleetData, playerId);
+            Console.WriteLine($"[Game] Produce fleet command: Player {playerId}, Target {targetId}");
         }
 
         /// <summary>
         /// 자원 생산 처리
+        /// - 각 플레이어의 행성에서 자원 생산
+        /// - 4틱마다 호출됨 (200ms 주기)
         /// </summary>
-        void ResourceProduction(long currentTick)
+        private void ResourceProduction(long currentTick)
         {
-            // 자원 생산 로직 구현
-            // 예: 플레이어 자원 업데이트, 건물 생산량 계산 등
+            // TODO: 자원 생산 로직 구현
+            // - 각 플레이어가 소유한 행성 순회
+            // - 행성 타입에 따른 자원 생산량 계산
+            // - 플레이어 자원에 추가
         }
 
         /// <summary>
         /// 생산 처리
+        /// - 진행 중인 함대 생산 업데이트
+        /// - ProduceController에게 위임
         /// </summary>
-        void ProductionProcess(long currentTick)
+        private void ProductionProcess(long currentTick)
         {
-            // 생산 로직 구현
-            // 예: 건물, 유닛 생산 진행 상황 업데이트
-
-            produceController.HandleUpdateLoop(currentTick);
+            m_produceController.ProcessUpdate(currentTick);
         }
 
         /// <summary>
         /// 이동 처리
+        /// - 이동 중인 함대들의 위치 업데이트
+        /// - FleetController에게 위임
         /// </summary>
-        void MovementProcess(long currentTick)
+        private void MovementProcess(long currentTick)
         {
-            // 이동 로직 구현
-            // 예: 유닛 위치 업데이트, 경로 계산 등   
+            m_fleetController.HandleMovementProcess(currentTick);
         }
 
         /// <summary>
         /// 전투 처리
+        /// - 같은 행성에 있는 적 함대 간 전투 진행
+        /// - FleetController에게 위임
         /// </summary>
-        void CombatProcess(long currentTick)
+        private void CombatProcess(long currentTick)
         {
-            // 전투 로직 구현
-            // 예: 유닛 간 전투 처리, 데미지 계산 등
+            m_fleetController.HandleCombatProcess(currentTick);
         }
 
         /// <summary>
         /// 점령 처리
+        /// - 함대가 적 행성을 점령하는 과정 처리
+        /// - FleetController에게 위임
         /// </summary>
-        void ConquerProcess(long currentTick)
+        private void ConquerProcess(long currentTick)
         {
-            // 점령 로직 구현
-            // 예: 행성 점령 상태 업데이트
+            m_fleetController.HandleConquerProcess(currentTick);
         }
 
         /// <summary>
         /// 승리 조건 확인
+        /// - 게임 종료 조건 체크
+        /// - 10틱마다 호출됨 (500ms 주기)
         /// </summary>
-        void CheckWinCondition(long currentTick)
+        private void CheckWinCondition(long currentTick)
         {
-            // 승리 조건 확인 로직 구현
-            // 예: 점령 상태, 자원량, 유닛 수 등을 기준으로 승리 여부 판단
+            // TODO: 승리 조건 확인 로직 구현
+            // 예시:
+            // - 한 플레이어가 모든 행성 점령
+            // - 한 플레이어의 모든 함대가 파괴됨
+            // - 시간 제한 도달 (더 많은 행성 소유한 플레이어 승리)
         }
 
         /// <summary>
-        /// 상태 브로드캐스트
+        /// 게임 상태 브로드캐스트
+        /// - 현재 게임 상태를 모든 클라이언트에게 전송
+        /// - 함대 위치, 행성 소유권, 자원 등
         /// </summary>
-        void BroadcastEvent(long currentTick)
+        private void BroadcastEvent(long currentTick)
         {
-            // 상태 브로드캐스트 로직 구현
-            // 예: 게임 상태를 모든 클라이언트에 전송
+            // TODO: 게임 상태 브로드캐스트 로직 구현
+            // - 현재 게임 상태 직렬화
+            // - 모든 플레이어에게 전송
+            // - 필요한 경우 델타 업데이트만 전송 (최적화)
+        }
+        #endregion
 
-            // 필요한 경우 비동기로 처리 가능
-            // _ = Task.Run(() => SendGameStateToClients());
+        #region IDisposable 구현
+        /// <summary>
+        /// 리소스 해제 (public 인터페이스)
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this); // Finalizer 호출 방지
+        }
+
+        /// <summary>
+        /// 리소스 해제 (실제 구현)
+        /// - Managed 리소스만 해제 (Unmanaged 리소스는 없음)
+        /// - 중복 호출 방지
+        /// </summary>
+        /// <param name="disposing">Dispose 메서드에서 호출되었는지 여부</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            // 이미 Dispose 되었으면 조기 반환
+            if (m_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Managed 리소스 해제
+                StopGame(); // 게임 중지
+
+                m_gameLoopCts?.Cancel();    // 게임 루프 취소
+                m_gameLoopCts?.Dispose();   // CancellationTokenSource 해제
+                m_commandSemaphore?.Dispose(); // SemaphoreSlim 해제
+
+                Console.WriteLine("[Game] Disposed");
+            }
+
+            m_disposed = true;
         }
         #endregion
     }

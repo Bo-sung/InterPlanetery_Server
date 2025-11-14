@@ -1,4 +1,4 @@
-using CommonLib;
+﻿using CommonLib;
 using CommonLib.TableData;
 
 namespace BaseServer.Core.Game.Entities
@@ -33,7 +33,7 @@ namespace BaseServer.Core.Game.Entities
         {
             _planetInfo = planetInfo;
             _planetLayout = planetLayout;
-            
+
             Position = new Vector2(_planetLayout.PositionX, _planetLayout.PositionY);
 
             OwnerId = -1; // 기본값: 중립
