@@ -585,10 +585,11 @@ namespace BaseServer.Core.Game.Entities
 
             // 이동 명령 실행
             Console.WriteLine($"[Game] Move fleet command: Player {moveCommand.PlayerId}, " +
-                $"Fleet {moveCommand.FleetId} -> Planet {moveCommand.TargetPlanetId}");
+                $"Fleet {moveCommand.PlayerId} -> Planet {moveCommand.TargetPlanetId}");
 
             // TODO: FleetController에게 실제 이동 명령 전달
-            // m_fleetController.CommandMove(moveCommand.FleetId, moveCommand.TargetPlanetId);
+            // m_fleetController.CommandMove(moveCommand.Id, moveCommand.TargetPlanetId);
+            m_fleetController.CommandMove(moveCommand.TargetFleet, moveCommand.TargetPlanetId);
         }
 
         /// <summary>
@@ -628,10 +629,13 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void ResourceProduction(long currentTick)
         {
-            // TODO: 자원 생산 로직 구현
-            // - 각 플레이어가 소유한 행성 순회
-            // - 행성 타입에 따른 자원 생산량 계산
-            // - 플레이어 자원에 추가
+            if (m_gameMap == null)
+                return;
+
+            foreach (var user in m_players)
+            {
+                user.Update_Resource(m_gameMap, currentTick);
+            }
         }
 
         /// <summary>

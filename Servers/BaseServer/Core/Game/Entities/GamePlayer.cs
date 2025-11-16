@@ -1,14 +1,15 @@
-﻿using CommonLib;
+﻿using BaseServer.Core.Game;
+using BaseServer.Core.Game.Session;
+using CommonLib;
 using CommonLib.Commands;
 using CommonLib.TableData;
+using MySqlX.XDevAPI;
 using System.Data;
 using System.Net.Sockets;
-using System.Windows.Input;
-using BaseServer.Core.Game.Session;
-using ProtocolType = CommonLib.ProtocolType;
+using System.Numerics;
 using System.Reflection.Emit;
-using MySqlX.XDevAPI;
-using BaseServer.Core.Game;
+using System.Windows.Input;
+using ProtocolType = CommonLib.ProtocolType;
 
 namespace BaseServer.Core.Game.Entities
 {
@@ -159,13 +160,27 @@ namespace BaseServer.Core.Game.Entities
         #endregion
 
         #region 게임 로직
-        public void Update_Resource(long tick)
+        public void Update_Resource(GameMap map, long tick)
         {
             // 틱당 자원 처리
             // 점령한 행성들의 자원 총합
             int tickGas = 0;
             int tickMin = 0;
             int tickSup = 0;
+
+            foreach(var pindex in Planets)
+            {
+                var planet = map.GetPlanet(pindex);
+                if (planet == null)
+                    continue;
+                tickGas += planet.Gas;
+                tickMin += planet.Mineral;
+                tickSup += planet.Supply;
+            }
+
+            Gas += tickGas;
+            Mineral += tickMin;
+            Supply = tickSup;       // 인구수는 초당 생산이 아니라 케파임.
         }
         #endregion
     }

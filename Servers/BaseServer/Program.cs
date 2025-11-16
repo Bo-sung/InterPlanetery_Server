@@ -2,10 +2,10 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using CommonLib;
-using BaseServer.Core.Game.Session;
 using BaseServer.Core.Game.Managers;
+using BaseServer.Core.Game.Session;
 using BaseServer.Database;
+using Microsoft.Extensions.Configuration;
 
 namespace BaseServer
 {
@@ -18,28 +18,46 @@ namespace BaseServer
             Console.WriteLine("========================================");
             Console.WriteLine();
 
+            IConfiguration config = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            // CommonLib은 자체적으로 설정을 로드할 것으로 가정합니다.
+            // DBManager.Instance.UpdateTable() 호출 시 CommonLib.AppConfig가 사용됩니다.
             DBManager dBManager = DBManager.Instance;
             dBManager.UpdateTable();
 
             TcpListener server = null;
             try
             {
-                int port = 7777;
-                IPAddress localAddr = IPAddress.Parse("127.0.0.1");
+                string host = config.GetValue<string>("Server:Host");
+                int port = config.GetValue<int>("Server:Port");
+                
+                if (string.IsNullOrEmpty(host))
+                {
+                    Console.WriteLine("[ERROR] Server:Host is not configured in appsettings.json");
+                    return;
+                }
+
+                IPAddress[] addresses = Dns.GetHostAddresses(host);
+                if (addresses.Length == 0)
+                {
+                    Console.WriteLine($"[ERROR] Could not resolve host: {host}");
+                    return;
+                }
+                IPAddress localAddr = addresses[0];
 
                 server = new TcpListener(localAddr, port);
                 server.Start();
 
-                Console.WriteLine($"[Server] Listening on port {port}");
+                Console.WriteLine($"[Server] Listening on {host}:{port}");
                 Console.WriteLine("[Server] Waiting for clients to connect...");
                 Console.WriteLine();
 
                 while (true)
                 {
-                    // 클라이언트 연결 대기
                     TcpClient client = await server.AcceptTcpClientAsync();
-
-                    // 새 세션 생성 및 시작 (비동기로 처리)
                     ClientSession session = new ClientSession(client);
                     _ = Task.Run(async () => await session.StartAsync());
                 }

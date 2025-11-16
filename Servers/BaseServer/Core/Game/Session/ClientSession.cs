@@ -1,13 +1,14 @@
 ﻿using BaseServer.Core.Game.Entities;
 using BaseServer.Core.Game.Managers;
 using BaseServer.Network;
+using CommonLib;
+using MySqlX.XDevAPI;
 using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using CommonLib;
 using static BaseServer.Network.ProtocolHandler;
 
 namespace BaseServer.Core.Game.Session
@@ -79,7 +80,7 @@ namespace BaseServer.Core.Game.Session
                 StartTimeoutCheck();
 
                 // 메시지 수신 루프
-                await ReceiveLoop();
+                _ = Task.Run(async () => await ReceiveLoop());
             }
             catch (Exception e)
             {

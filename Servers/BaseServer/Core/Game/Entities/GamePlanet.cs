@@ -15,7 +15,7 @@ namespace BaseServer.Core.Game.Entities
         // --- 실시간 상태 값 (서버 로직에서만 사용) ---
         public int OwnerId { get; set; }
         public float ConquestProgress { get; set; }
-        public int GarrisonFleetId { get; set; }
+
         // -----------------------------------------
 
         // 기본 데이터에 대한 접근자 프로퍼티
@@ -38,7 +38,21 @@ namespace BaseServer.Core.Game.Entities
 
             OwnerId = -1; // 기본값: 중립
             ConquestProgress = 0;
-            GarrisonFleetId = -1;
+        }
+
+        public void Conquest(Fleet_Re fleet, long tick)
+        {
+            if(fleet == null)
+                return;
+
+            if(fleet.Owner == OwnerId)
+            {
+                ConquestProgress++;
+            }
+            else
+            {
+                ConquestProgress--;
+            }
         }
     }
 }
