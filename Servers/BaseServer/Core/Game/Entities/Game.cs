@@ -38,6 +38,10 @@ namespace BaseServer.Core.Game.Entities
         // 업데이트 주기 상수
         private const int RESOURCE_UPDATE_INTERVAL = 4;  // 4틱마다 자원 생산 (200ms)
         private const int WIN_CHECK_INTERVAL = 10;       // 10틱마다 승리 조건 체크 (500ms)
+
+        // 전투 관련 상수
+        private const float ATTACK_TICK_INTERVAL = 1f; // 1초마다 공격
+        private const float OCCUPY_DURATION = 5f;      // 점령 5초
         #endregion
 
         #region 필드
@@ -64,6 +68,7 @@ namespace BaseServer.Core.Game.Entities
         private readonly DBManager m_dbManager;             // 데이터베이스 매니저
         private readonly ProduceController m_produceController;  // 함대 생산 컨트롤러
         private readonly FleetController m_fleetController;      // 함대 이동/전투 컨트롤러
+        private readonly Dictionary<int, Fleet_Re> m_dic_fleets = new Dictionary<int, Fleet_Re>();
         private readonly GamePlayer[] m_players = new GamePlayer[MAX_PLAYERS]; // 플레이어 배열
 
         // 게임 루프 제어
@@ -95,8 +100,7 @@ namespace BaseServer.Core.Game.Entities
             m_mapManager = MapManager.Instance;
 
             // 게임 컨트롤러 생성
-            m_fleetController = new FleetController();
-            m_produceController = new ProduceController(m_dbManager, m_fleetController);
+            m_produceController = new ProduceController(m_dbManager);
 
             // 플레이어 슬롯 미리 생성 (최대 2명)
             for (int i = 0; i < MAX_PLAYERS; i++)
