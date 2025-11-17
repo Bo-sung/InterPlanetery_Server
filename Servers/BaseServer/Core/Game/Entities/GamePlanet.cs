@@ -40,7 +40,7 @@ namespace BaseServer.Core.Game.Entities
             ConquestProgress = 0;
         }
 
-        public void Conquest(Fleet_Re fleet, long tick)
+        public void Conquest(Fleet fleet, long tick)
         {
             if(fleet == null)
                 return;

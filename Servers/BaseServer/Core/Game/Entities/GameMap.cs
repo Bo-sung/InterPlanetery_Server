@@ -16,6 +16,8 @@ namespace BaseServer.Core.Game.Entities
         private Dictionary<int, HashSet<int>> _pathCashDict; // 경로 캐시
         private int[] _players = new int[Game.MAX_PLAYERS];
         private Dictionary<int, int> _homePlanet = new Dictionary<int, int>();
+        public GamePlanet[] Planets => _planetDict.Values.ToArray();
+
 
         public GameMap(MapData staticMapData)
         {

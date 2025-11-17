@@ -48,6 +48,7 @@ namespace BaseServer.Core.Game.Entities
         // 동기화 객체
         private readonly SemaphoreSlim m_commandSemaphore = new SemaphoreSlim(1, 1); // 명령 큐 접근 동기화
 
+        private long m_CASHED_NEXTFLEET_ID = 0;
         // 게임 상태
         private int m_gameState = GAMESTATE_WAITING;    // 현재 게임 상태
         private bool m_inCombat = false;                // 전투 중인지 여부
@@ -67,8 +68,8 @@ namespace BaseServer.Core.Game.Entities
         private readonly MapManager m_mapManager;           // 맵 데이터 로더
         private readonly DBManager m_dbManager;             // 데이터베이스 매니저
         private readonly ProduceController m_produceController;  // 함대 생산 컨트롤러
-        private readonly FleetController m_fleetController;      // 함대 이동/전투 컨트롤러
-        private readonly Dictionary<int, Fleet_Re> m_dic_fleets = new Dictionary<int, Fleet_Re>();
+        //private readonly FleetController m_fleetController;      // 함대 이동/전투 컨트롤러
+        private readonly Dictionary<long, Fleet> m_dic_fleets = new Dictionary<long, Fleet>();
         private readonly GamePlayer[] m_players = new GamePlayer[MAX_PLAYERS]; // 플레이어 배열
 
         // 게임 루프 제어
@@ -281,9 +282,7 @@ namespace BaseServer.Core.Game.Entities
 
             // GameMap 객체 생성 (행성, 경로 정보 초기화)
             m_gameMap = new GameMap(staticMapData);
-
-            // FleetController에 맵 정보 전달
-            m_fleetController.InitController(m_gameMap);
+            m_produceController.OnProductionFinish += HandleOnProductionFinish;
 
             // 게임 상태 초기화
             m_gameState = GAMESTATE_RUNNING;                              // 게임 실행 상태로 변경
@@ -298,6 +297,11 @@ namespace BaseServer.Core.Game.Entities
             _ = Task.Run(() => GameLoop(m_gameLoopCts.Token));
 
             return true;
+        }
+
+        private void HandleOnProductionFinish(Fleet output)
+        {
+            m_dic_fleets.Add(output.ID, output);
         }
 
         /// <summary>
@@ -586,14 +590,28 @@ namespace BaseServer.Core.Game.Entities
                 Console.WriteLine($"[Game] Invalid MoveFleetCommand");
                 return;
             }
-
+            var fleetId = moveCommand.TargetFleet;
+            var playerId = moveCommand.PlayerId;
+            var planetId = moveCommand.TargetPlanetId;
             // 이동 명령 실행
-            Console.WriteLine($"[Game] Move fleet command: Player {moveCommand.PlayerId}, " +
-                $"Fleet {moveCommand.PlayerId} -> Planet {moveCommand.TargetPlanetId}");
+            Console.WriteLine($"[Game] Move fleet command: Player {playerId}, " +
+                $"Fleet {fleetId} -> Planet {planetId}");
 
-            // TODO: FleetController에게 실제 이동 명령 전달
-            // m_fleetController.CommandMove(moveCommand.Id, moveCommand.TargetPlanetId);
-            m_fleetController.CommandMove(moveCommand.TargetFleet, moveCommand.TargetPlanetId);
+            if(!m_dic_fleets.ContainsKey(fleetId))
+            {
+                Console.WriteLine($"[Game] Invalid TargetFleet!! : TargetFleet = {fleetId}");
+                return;
+            }
+
+            var planet = m_gameMap?.GetPlanet(planetId);
+            if (planet == null)
+            {
+                Console.WriteLine($"[Game] Invalid TargetPlanetId!! : TargetPlanetId = {planetId}");
+                return;
+            }
+
+            var fleet = m_dic_fleets[fleetId];
+            fleet.Navigate(planet, GetCurrentTick());
         }
 
         /// <summary>
@@ -620,10 +638,21 @@ namespace BaseServer.Core.Game.Entities
                 Console.WriteLine($"[Game] Invalid production target ID: {targetId}");
                 return;
             }
+            // 유효한 키 찾을때까지 반복
+            for(long id = 0; id < long.MaxValue; ++id)
+            {
+                // 이미 있으면 패스
+                if (m_dic_fleets.ContainsKey(id))
+                    continue;
+                // 생산 리스트에 있으면 패스
+                if (m_produceController.IsOnProduction(id))
+                    continue;
 
-            // 생산 컨트롤러에게 생산 요청
-            m_produceController.RequestProcess(produceFleetData, playerId);
-            Console.WriteLine($"[Game] Produce fleet command: Player {playerId}, Target {targetId}");
+                // 생산 컨트롤러에게 생산 요청
+                Console.WriteLine($"[Game] Produce fleet command: Player {playerId}, Target {targetId}");
+                m_produceController.RequestProcess(produceFleetData, playerId, id);
+                break;
+            }
         }
 
         /// <summary>
@@ -659,7 +688,45 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void MovementProcess(long currentTick)
         {
-            m_fleetController.HandleMovementProcess(currentTick);
+            foreach(var fleet in m_dic_fleets)
+            {
+                fleet.Value.UpdateMovement(currentTick);
+                // 전투 범위 체크
+                // 함대 리스트.
+                var enemys = m_dic_fleets.Values.ToList();
+                // 함대 리스트에서 소유자 같은 모든 함선 제거
+                enemys.RemoveAll(x => x.Owner == fleet.Value.Owner);
+                // 가장 가까운 적을 enemy로 세팅
+                foreach (var enemy in enemys)
+                {
+                    // 만약 적의 적이 있는데. 그게 현재 함대면 패스
+                    if (enemy.Enemy != null && enemy.Enemy.Equals(fleet.Value))
+                    {
+                        continue;
+                    }
+                    // 공격 범위 체크
+                    if (fleet.Value.IsAttackRange(enemy))
+                    {
+                        if (fleet.Value.Enemy == null)
+                        {
+                            fleet.Value.SetAttackTarget(enemy);
+                            enemy.SetAttackTarget(fleet.Value);
+                            continue;
+                        }
+                        else
+                        {
+                            float dist1 = CommonLib.Vector2.Distance(fleet.Value.Position, enemy.Position);
+                            float dist2 = CommonLib.Vector2.Distance(fleet.Value.Position, fleet.Value.Enemy.Position);
+                            // 지금 적이 더 가까우면 교체
+                            if (dist1 < dist2)
+                            {
+                                fleet.Value.SetAttackTarget(enemy);
+                                enemy.SetAttackTarget(fleet.Value);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -669,7 +736,10 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void CombatProcess(long currentTick)
         {
-            m_fleetController.HandleCombatProcess(currentTick);
+            foreach (var fleet in m_dic_fleets)
+            {
+                fleet.Value.UpdateAttack(currentTick);
+            }
         }
 
         /// <summary>
@@ -679,7 +749,11 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void ConquerProcess(long currentTick)
         {
-            m_fleetController.HandleConquerProcess(currentTick);
+            if (m_gameMap == null)
+                return;
+            foreach(var planet in m_gameMap.Planets)
+            {
+            }
         }
 
         /// <summary>

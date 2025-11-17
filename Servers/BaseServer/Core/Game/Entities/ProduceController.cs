@@ -7,7 +7,7 @@ namespace BaseServer.Core.Game.Entities
     public class ProductionInfo
     {
         public int PlayerId { get; set; }
-        public Fleet_Re Fleet { get; set; }
+        public Fleet Fleet { get; set; }
         public DateTime StartTime { get; set; }
         public float ProductionTime { get; set; }  // 총 생산 시간 (초)
         public float RemainingTime { get; set; }   // 남은 생산 시간 (초)
@@ -19,17 +19,23 @@ namespace BaseServer.Core.Game.Entities
     {
         // 생산 중인 함대 정보 (PlayerId -> 생산 중인 Fleet 리스트)
         private Dictionary<int, List<ProductionInfo>> productionQueue = new Dictionary<int, List<ProductionInfo>>();
+        private List<long> productions = new List<long>();
         private DB_Table _db;
 
-        public System.Action<Fleet_Re> OnProductionFinish;
+        public System.Action<Fleet> OnProductionFinish;
 
         public ProduceController(DBManager db)
         {
             this._db = db.Table;
         }
 
+        public bool IsOnProduction(long id)
+        {
+            return productions.Contains(id);
+        }
+
         // 생산 요청 처리
-        public void RequestProcess(int fleetType, int playerId)
+        public void RequestProcess(int fleetType, int playerId, long nextFleetId)
         {
             var data = GetProductionInfoDataFromDB(fleetType);
             if (data == null)
@@ -38,11 +44,11 @@ namespace BaseServer.Core.Game.Entities
                 return;
             }
             
-            RequestProcess(data, playerId);
+            RequestProcess(data, playerId, nextFleetId);
         }
 
         // 생산 요청 처리
-        public void RequestProcess(ProductionInfoData productionData, int playerId)
+        public void RequestProcess(ProductionInfoData productionData, int playerId, long nextFleetId)
         {
             // 플레이어의 생산 큐가 없으면 생성
             if (!productionQueue.ContainsKey(playerId))
@@ -60,13 +66,14 @@ namespace BaseServer.Core.Game.Entities
             ProductionInfo production = new ProductionInfo
             {
                 PlayerId = playerId,
-                Fleet = new Fleet_Re(fleetData, playerId),
+                Fleet = new Fleet(fleetData, playerId, nextFleetId),
                 StartTime = DateTime.Now,
                 ProductionTime = productionData.ProductionTime,
                 RemainingTime = productionData.ProductionTime
             };
 
             productionQueue[playerId].Add(production);
+            productions.Add(nextFleetId);
             Console.WriteLine($"Player {playerId} started producing fleet {production.Fleet.ID}");
         }
 
@@ -109,7 +116,7 @@ namespace BaseServer.Core.Game.Entities
 
             // FleetController로 완성된 Fleet 전달
             OnProductionFinish?.Invoke(production.Fleet);
-
+            productions.Remove(production.Fleet.ID);
             // DB에 생산 완료 기록 (필요시)
             SaveProductionToDB(production);
         }

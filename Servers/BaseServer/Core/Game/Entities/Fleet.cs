@@ -3,18 +3,15 @@ using CommonLib.TableData; // MapData, Planet
 
 namespace BaseServer.Core.Game.Entities
 {
-    public class Fleet_Re
+    public class Fleet
     {
         public const float ATTACK_RANGE = 10;
-        // 장버
-        private int _instanceId;
+        public const int ATTACK_DELAY = 2;
+        private long _instanceId;
         private int _ownerId;
         private FleetInfoData _data;
         private FleetState _state;
         private Vector2 _position;
-
-        // 스텟
-        private float _curHealth;
 
         // 이동 처리용
         private Vector2 _moveFrom = new Vector2(0,0);
@@ -23,8 +20,13 @@ namespace BaseServer.Core.Game.Entities
         private float _progress = 0;
         private long _moveStartTime = 0;
 
+        // 전투 처리용
+        private Fleet? _Enemy;
+        private float _curHealth;
+        private long _lastAttackTick = 0;
+
         // 외부 출력용
-        public int ID => _instanceId;
+        public long ID => _instanceId;
         public int Owner => _ownerId;
         public FleetState State => _state;
         public float CurHealth => _curHealth;
@@ -34,30 +36,40 @@ namespace BaseServer.Core.Game.Entities
         public float MoveSpeed => _data.MoveSpeed;
         public float AttackPower => _data.AttackPower;
 
-        public Fleet_Re(FleetInfoData data, int ownerId)
+        public Fleet? Enemy => _Enemy;
+
+        public Fleet(FleetInfoData data, int ownerId, long instanceId)
         {
             this._data = data;
             this._ownerId = ownerId;
             this._state = FleetState.Idle;
             this._curHealth = data.MaxHealth; // 최대 체력으로 초기화
             this._position = new Vector2(0,0);
+            this._instanceId = instanceId;
         }
 
-        public Fleet_Re(FleetInfoData data, int ownerId, Vector2 position)
+        public Fleet(FleetInfoData data, int ownerId, Vector2 position, long instanceId)
         {
             this._data = data;
             this._ownerId = ownerId;
             this._state = FleetState.Idle;
             this._curHealth = data.MaxHealth; // 최대 체력으로 초기화
             this._position = position;
+            this._instanceId = instanceId;
         }
 
-        public bool IsAttackRange(Fleet_Re target)
+        public bool IsAttackRange(Fleet target)
         {
             return Vector2.Distance(this._position, target._position) < ATTACK_RANGE;
         }
 
-        public void TakeDamage(Fleet_Re attacker)
+        public void SetAttackTarget(Fleet target)
+        {
+            _Enemy = target;
+        }
+
+
+        public void TakeDamage(Fleet attacker)
         {
             if(attacker == null)
                 return;
@@ -73,7 +85,7 @@ namespace BaseServer.Core.Game.Entities
             }
         }
 
-        public void ApplyDamage(Fleet_Re target)
+        public void ApplyDamage(Fleet target)
         {
             if (target == null)
                 return;
@@ -86,6 +98,25 @@ namespace BaseServer.Core.Game.Entities
             _moveTo = target.Position;
             _moveFrom = Position;
             _moveStartTime = currentTick;
+        }
+
+        public void UpdateAttack(long currentTick)
+        {
+            if (_state != FleetState.Attacking)
+                return;
+            if (_Enemy == null)
+                return;
+
+            // 첫 시작인 경우
+            if (_lastAttackTick == 0)
+                _lastAttackTick = currentTick;
+
+            // 마지막 공격 틱 이후 ATTACK_DELAY 이상 지난 경우 공격 처리
+            if (currentTick >= _lastAttackTick + ATTACK_DELAY)
+            {
+                _Enemy.ApplyDamage(this);
+                _lastAttackTick = currentTick;
+            }
         }
 
         public void UpdateMovement(long currentTick)
@@ -115,121 +146,23 @@ namespace BaseServer.Core.Game.Entities
 
             // 선형 보간
             float progress = (float)elapsedMs / requiredMs;
+            var beforePos = _position;
             _position = Vector2.Lerp(_moveFrom, _moveTo, progress);
+
+            Console.WriteLine($"[GAME] FleetMoved. ID : {ID}, before :{beforePos} After : {_position}");
         }
-    }
-
-
-    public class Fleet
-    {
-        private int _instanceId;
-        public int ID => _instanceId;
-
-        private FleetInfoData _data;
-        public FleetInfoData Data => _data;
-
-        public Vector2 Position { get; private set; }
-        public FleetState State { get; private set; }
-
-        // 현재 체력
-        public int CurrentHealth { get; private set; }
-
-        // 이동 관련
-        public int? CurrentPlanetId { get; private set; }  // 현재 위치한 행성 (Idle 상태)
-        public int? TargetPlanetId { get; private set; }   // 목표 행성 (인접한 행성만 가능)
-
-        // 전투/점령 관련
-        public float ActionProgress { get; private set; }  // 작업 진행도 (0~1)
-        public int OwnerId { get; private set; }           // 함대 소유자 ID
-
-        public Fleet(FleetInfoData data, int ownerId)
+        public void PrintInfo()
         {
-            this._data = data;
-            this.OwnerId = ownerId;
-            this.State = FleetState.Idle;
-            this.CurrentHealth = data.MaxHealth; // 최대 체력으로 초기화
-        }
-
-        public void SetID(int id)
-        {
-            this._instanceId = id;
-        }
-
-        public void SetPosition(Vector2 position)
-        {
-            this.Position = position;
-        }
-
-        public void SetState(FleetState newState)
-        {
-            Console.WriteLine($"[Fleet {ID}] State changed: {State} -> {newState}");
-            this.State = newState;
-        }
-
-        public void SetCurrentPlanet(int? planetId)
-        {
-            this.CurrentPlanetId = planetId;
-        }
-
-        public void StartMove(int targetPlanetId)
-        {
-            this.TargetPlanetId = targetPlanetId;
-            this.CurrentPlanetId = null;
-            this.State = FleetState.Moving;
-            this.ActionProgress = 0f;
-
-            Console.WriteLine($"[Fleet {ID}] Started moving to planet {targetPlanetId}");
-        }
-
-        public void StartAttack()
-        {
-            this.State = FleetState.Attacking;
-            this.ActionProgress = 0f;
-            Console.WriteLine($"[Fleet {ID}] Started attacking");
-        }
-
-        public void StartOccupy()
-        {
-            this.State = FleetState.Occupying;
-            this.ActionProgress = 0f;
-            Console.WriteLine($"[Fleet {ID}] Started occupying");
-        }
-
-        public void UpdateActionProgress(float deltaProgress)
-        {
-            this.ActionProgress = Math.Min(1f, this.ActionProgress + deltaProgress);
-        }
-
-        public void CompleteAction()
-        {
-            this.ActionProgress = 0f;
-        }
-
-        public void TakeDamage(int damage)
-        {
-            CurrentHealth = Math.Max(0, CurrentHealth - damage);
-            Console.WriteLine($"[Fleet {ID}] Took {damage} damage. Health: {CurrentHealth}/{_data.MaxHealth}");
-
-            if (CurrentHealth <= 0)
-            {
-                Console.WriteLine($"[Fleet {ID}] Destroyed!");
-            }
-        }
-
-        public void Heal(int amount)
-        {
-            CurrentHealth = Math.Min(_data.MaxHealth, CurrentHealth + amount);
-            Console.WriteLine($"[Fleet {ID}] Healed {amount}. Health: {CurrentHealth}/{_data.MaxHealth}");
-        }
-
-        public bool IsAlive()
-        {
-            return CurrentHealth > 0;
-        }
-
-        public bool IsDestroyed()
-        {
-            return CurrentHealth <= 0;
+            Console.WriteLine($"=== Fleet {this.ID} Info ===");
+            Console.WriteLine($"Name: {this.Name}");
+            Console.WriteLine($"Type: {this._data.Type}");
+            Console.WriteLine($"Health: {this.CurHealth}/{this._data.MaxHealth}");
+            Console.WriteLine($"Attack Power: {this.AttackPower}");
+            Console.WriteLine($"Move Speed: {this.MoveSpeed}");
+            Console.WriteLine($"State: {this.State}");
+            Console.WriteLine($"Owner ID: {this.Owner}");
+            Console.WriteLine($"Position: {this.Position}");
+            Console.WriteLine($"========================");
         }
     }
 }
