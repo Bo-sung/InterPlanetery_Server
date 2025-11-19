@@ -42,10 +42,10 @@
 ### REQUEST_LOGIN
 - ID: 10000
 - param:
-  - id: string
+  - username: string
   - password: string
 - 응답 param:
-  - sessionId: int
+  - sessionId: string
 
 ### REQUEST_LOGOUT
 - ID: 10001

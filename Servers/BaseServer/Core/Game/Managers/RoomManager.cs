@@ -125,6 +125,34 @@ namespace BaseServer.Core.Game.Managers
         }
 
         /// <summary>
+        /// 모든 룸 리스트 가져오기 (RoomInfo 배열)
+        /// </summary>
+        public CommonLib.RoomInfo[] GetRoomList()
+        {
+            return m_rooms.Values.Select(room => room.RoomInfo).ToArray();
+        }
+
+        /// <summary>
+        /// 페이지네이션된 룸 리스트 가져오기
+        /// </summary>
+        /// <param name="page">페이지 번호 (0이면 전체)</param>
+        /// <param name="pageSize">페이지당 아이템 수</param>
+        public CommonLib.RoomInfo[] GetRoomList(int page, int pageSize = 10)
+        {
+            if (page <= 0)
+            {
+                // 페이지 0이면 전체 반환
+                return GetRoomList();
+            }
+
+            return m_rooms.Values
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(room => room.RoomInfo)
+                .ToArray();
+        }
+
+        /// <summary>
         /// 현재 룸 상태 출력
         /// </summary>
         public void PrintStatus()

@@ -11,6 +11,8 @@
         public const int CHAT_MESSAGE = 10002;                  //메세지 전송
         public const int HEARTBEAT = 10003;                     // 하트비트 (연결 유지 확인)
         public const int REQUEST_TABLEDATA = 10004;             // 테이블 데이터 요청
+        public const int REQUEST_REGISTER = 10005;              // 회원가입 요청
+        public const int REQUEST_REGISTER_AUTO = 10006;         // 자동 회원가입 요청 (게스트)
         
         public const int CHAT_CHANNEL_JOIN = 10100;
         public const int CHAT_CHANNEL_REFRESH = 10101;

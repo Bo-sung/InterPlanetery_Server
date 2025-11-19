@@ -1,5 +1,6 @@
 ﻿using BaseServer.Core.Game.Entities;
 using BaseServer.Core.Game.Managers;
+using BaseServer.Database;
 using BaseServer.Network;
 using CommonLib;
 using MySqlX.XDevAPI;
@@ -57,6 +58,14 @@ namespace BaseServer.Core.Game.Session
         protected virtual void RegisterProtocolHandlers()
         {
             m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.HEARTBEAT, HandleHeartbeat);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_REGISTER, Handle_RequestRegister);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_REGISTER_AUTO, Handle_RequestRegisterAuto);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_LOGIN, Handle_RequestLogin);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_LOGOUT, Handle_RequestLogout);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_JOIN_LOBBY, Handle_RequestJoinLobby);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REFRESH_LOBBY, Handle_RefreshLobby);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_CREATE_ROOM, Handle_RequestCreateRoom);
+            m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_JOIN_ROOM, Handle_RequestJoinRoom);
         }
 
         public void RegisterProto(int Protocol, ProtocolHandlerDelegate handler)
@@ -81,6 +90,8 @@ namespace BaseServer.Core.Game.Session
 
                 // 메시지 수신 루프
                 _ = Task.Run(async () => await ReceiveLoop());
+
+
             }
             catch (Exception e)
             {
@@ -251,6 +262,349 @@ namespace BaseServer.Core.Game.Session
                 .AddParam("serverTime", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
 
             await SendAsync(ackProtocol.Serialize());
+        }
+
+        // REQUEST_REGISTER
+        // ID: 10005
+        // param: username (string), password (string)
+        // 응답 param: 없음
+        private async Task Handle_RequestRegister(Protocol protocol)
+        {
+            var username = protocol.GetParam<string>("username");
+            var password = protocol.GetParam<string>("password");
+
+            // 파라미터 검증
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            {
+                Console.WriteLine($"[Session {SessionId}] Register Failed - Invalid parameters (username or password is empty)");
+                var errorResponse = new Response(protocol.Type, StateCode.FAIL);
+                errorResponse.AddParam("message", "Username and password are required");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // 사용자명 길이 검증 (예: 3-20자)
+            if (username.Length < 3 || username.Length > 20)
+            {
+                Console.WriteLine($"[Session {SessionId}] Register Failed - Invalid username length (username: {username})");
+                var errorResponse = new Response(protocol.Type, StateCode.FAIL);
+                errorResponse.AddParam("message", "Username must be between 3 and 20 characters");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // 비밀번호 길이 검증 (예: 4-50자)
+            if (password.Length < 4 || password.Length > 50)
+            {
+                Console.WriteLine($"[Session {SessionId}] Register Failed - Invalid password length");
+                var errorResponse = new Response(protocol.Type, StateCode.FAIL);
+                errorResponse.AddParam("message", "Password must be between 4 and 50 characters");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // DB 접근 가능 여부 확인
+            var authDB = DBManager.Instance.Auth;
+            if (authDB == null)
+            {
+                Console.WriteLine($"[Session {SessionId}] Register Failed - Authentication database unavailable");
+                var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
+                errorResponse.AddParam("message", "Authentication service unavailable");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // 회원가입 시도
+            bool registerSuccess = authDB.RegisterUser(username, password);
+            if (!registerSuccess)
+            {
+                Console.WriteLine($"[Session {SessionId}] Register Failed - User already exists or database error (username: {username})");
+                var errorResponse = new Response(protocol.Type, StateCode.FAIL);
+                errorResponse.AddParam("message", "Username already exists or registration failed");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // 회원가입 성공
+            Console.WriteLine($"[Session {SessionId}] Register Success - UserName: {username}");
+
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddParam("message", "Registration successful. Please login.");
+            await SendAsync(response.Serialize());
+        }
+
+        // REQUEST_REGISTER_AUTO
+        // ID: 10006
+        // param: 없음
+        // 응답 param: username (string), password (string)
+        private async Task Handle_RequestRegisterAuto(Protocol protocol)
+        {
+            Console.WriteLine($"[Session {SessionId}] Auto Register Request");
+
+            // DB 접근 가능 여부 확인
+            var authDB = DBManager.Instance.Auth;
+            if (authDB == null)
+            {
+                Console.WriteLine($"[Session {SessionId}] Auto Register Failed - Authentication database unavailable");
+                var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
+                errorResponse.AddParam("message", "Authentication service unavailable");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // 자동 username/password 생성 (중복 체크 포함)
+            string username = string.Empty;
+            string password = string.Empty;
+            int maxRetries = 10;
+            bool success = false;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                // Username 생성: guest_ + 12자리 랜덤 문자열
+                username = "guest_" + Guid.NewGuid().ToString("N").Substring(0, 12);
+
+                // Password 생성: 16자리 랜덤 문자열
+                password = Guid.NewGuid().ToString("N").Substring(0, 16);
+
+                // 중복 체크
+                if (!authDB.UserExists(username))
+                {
+                    // 회원가입 시도
+                    if (authDB.RegisterUser(username, password))
+                    {
+                        success = true;
+                        break;
+                    }
+                }
+
+                Console.WriteLine($"[Session {SessionId}] Auto Register - Username collision, retrying... ({i + 1}/{maxRetries})");
+            }
+
+            if (!success)
+            {
+                Console.WriteLine($"[Session {SessionId}] Auto Register Failed - Could not generate unique username after {maxRetries} attempts");
+                var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
+                errorResponse.AddParam("message", "Failed to generate account. Please try again.");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            // 회원가입 성공
+            Console.WriteLine($"[Session {SessionId}] Auto Register Success - UserName: {username}");
+
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddParam("username", username);
+            response.AddParam("password", password);
+            response.AddParam("message", "Auto registration successful. Please save your credentials.");
+            await SendAsync(response.Serialize());
+        }
+
+        private async Task Handle_RequestLogin(Protocol protocol)
+        {
+            var username = protocol.GetParam<string>("username");
+            var password = protocol.GetParam<string>("password");
+
+            // 파라미터 검증
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            {
+                Console.WriteLine($"[Session {SessionId}] Login Failed - Invalid parameters (username or password is empty)");
+                var errorResponse = new Response(protocol.Type, StateCode.AUTH_FAILURE);
+                errorResponse.AddParam("message", "Username and password are required");
+                await SendAsync(errorResponse.Serialize());
+                Disconnect();
+                return;
+            }
+
+            // DB 접근 가능 여부 확인
+            var authDB = DBManager.Instance.Auth;
+            if (authDB == null)
+            {
+                Console.WriteLine($"[Session {SessionId}] Login Failed - Authentication database unavailable");
+                var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
+                errorResponse.AddParam("message", "Authentication service unavailable");
+                await SendAsync(errorResponse.Serialize());
+                Disconnect();
+                return;
+            }
+
+            // 사용자 인증
+            var userinfo = authDB.AuthenticateUser(username, password);
+            if (userinfo == null)
+            {
+                Console.WriteLine($"[Session {SessionId}] Login Failed - Invalid credentials (username: {username})");
+                var errorResponse = new Response(protocol.Type, StateCode.AUTH_FAILURE);
+                errorResponse.AddParam("message", "Invalid username or password");
+                await SendAsync(errorResponse.Serialize());
+                Disconnect();
+                return;
+            }
+            
+            // 인증 성공 - UserInfo 설정
+            m_userInfo = userinfo.Value;
+            Console.WriteLine($"[Session {SessionId}] Login Success - UserId: {m_userInfo.UserId}, UserName: {m_userInfo.UserName}");
+
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddParam("sessionId", SessionId);
+            await SendAsync(response.Serialize());
+        }
+
+        // REQUEST_LOGOUT
+        // ID: 10001
+        // param: 없음
+        // 응답 param: 없음
+        private async Task Handle_RequestLogout(Protocol protocol)
+        {
+            Console.WriteLine($"[Session {SessionId}] Logout Request: UserName={m_userInfo.UserName}");
+
+            // UserInfo 초기화
+            m_userInfo = default;
+
+            // 로그아웃 성공 응답
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            await SendAsync(response.Serialize());
+
+            Console.WriteLine($"[Session {SessionId}] Logout Success");
+
+            // 연결 종료 (로그아웃 후 재로그인 필요)
+            Disconnect();
+        }
+
+        // REQUEST_JOIN_LOBBY
+        // ID: 10010
+        // param: Page (int) - 0이면 전체
+        // 응답 param: roomCount, page, roomList (RoomInfo[])
+        private async Task Handle_RequestJoinLobby(Protocol protocol)
+        {
+            int page = protocol.GetParam<int>("Page");
+
+            Console.WriteLine($"[Session {SessionId}] Join Lobby Request - UserName: {m_userInfo.UserName}, Page: {page}");
+
+            // RoomManager에서 방 리스트 가져오기
+            var roomList = RoomManager.Instance.GetRoomList(page);
+            int totalRoomCount = RoomManager.Instance.GetRoomList().Length;
+
+            Console.WriteLine($"[Session {SessionId}] Join Lobby Success - Total Rooms: {totalRoomCount}, Page: {page}, Rooms in Page: {roomList.Length}");
+
+            // 응답 생성
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddParam("roomCount", totalRoomCount);
+            response.AddParam("page", page);
+            response.AddObject("roomList", roomList);
+
+            await SendAsync(response.Serialize());
+        }
+
+        // REFRESH_LOBBY
+        // ID: 10011
+        // param: 없음
+        // 응답 param: roomList (RoomInfo[])
+        private async Task Handle_RefreshLobby(Protocol protocol)
+        {
+            Console.WriteLine($"[Session {SessionId}] Refresh Lobby Request - UserName: {m_userInfo.UserName}");
+
+            // RoomManager에서 모든 방 리스트 가져오기
+            var roomList = RoomManager.Instance.GetRoomList();
+
+            Console.WriteLine($"[Session {SessionId}] Refresh Lobby Success - Total Rooms: {roomList.Length}");
+
+            // 응답 생성
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddObject("roomList", roomList);
+
+            await SendAsync(response.Serialize());
+        }
+
+        // REQUEST_CREATE_ROOM
+        // ID: 10012
+        // param: roomName (string), mapId (int), isPrivate (bool)
+        // 응답 param: roomId (string), slot (int)
+        private async Task Handle_RequestCreateRoom(Protocol protocol)
+        {
+            Console.WriteLine($"[Session {SessionId}] Create Room Request - UserName: {m_userInfo.UserName}");
+
+            // 파라미터 불러오기
+            string roomName = protocol.GetParam<string>("roomName");
+            int mapId = protocol.GetParam<int>("mapId");
+            bool isPrivate = protocol.GetParam<bool>("isPrivate");
+
+            Console.WriteLine($"[Session {SessionId}] Room Parameters - Name: {roomName}, MapID: {mapId}, Private: {isPrivate}");
+
+            // 방 생성
+            var room = RoomManager.Instance.CreateRoom();
+            if (room == null)
+            {
+                Console.WriteLine($"[Session {SessionId}] Create Room Failed - Room creation failed");
+                var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
+                errorResponse.AddParam("message", "Failed to create room");
+                await SendAsync(errorResponse.Serialize());
+                return;
+            }
+
+            room.UpdateRoomInfo(roomName, mapId);
+
+            Console.WriteLine($"[Session {SessionId}] Create Room Success - RoomID: {room.RoomId}");
+
+            // 성공 응답
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddParam("roomId", room.RoomId);
+            response.AddParam("slot", room.NextSlot());
+
+            await SendAsync(response.Serialize());
+        }
+
+        // REQUEST_JOIN_ROOM
+        // ID: 10013
+        // param: userId (int), roomId (string), slot (int)
+        // 응답 param: roominfo (RoomInfo), chatChannelId (int)
+        private async Task Handle_RequestJoinRoom(Protocol protocol)
+        {
+            Console.WriteLine($"[Session {SessionId}] Join Room Request - UserName: {m_userInfo.UserName}");
+
+            // 파라미터 불러오기
+            int userId = protocol.GetParam<int>("userId");
+            string roomId = protocol.GetParam<string>("roomId");
+            int slot = protocol.GetParam<int>("slot");
+
+            Console.WriteLine($"[Session {SessionId}] Room Parameters - RoomID: {roomId}, Slot: {slot}");
+
+            // 슬롯 범위 검증
+            if (slot >= GameRoom.MaxPlayers || slot < 0)
+            {
+                Console.WriteLine($"[Session {SessionId}] Join Room Failed - Invalid slot: {slot}");
+                var error = new Response(protocol.Type, StateCode.FAIL);
+                error.AddParam("message", "Invalid slot number");
+                await SendAsync(error.Serialize());
+                return;
+            }
+
+            // 룸 존재 확인
+            var room = RoomManager.Instance.GetRoom(roomId);
+            if (room == null)
+            {
+                Console.WriteLine($"[Session {SessionId}] Join Room Failed - Room not found: {roomId}");
+                var error = new Response(protocol.Type, StateCode.NO_RESOURCE);
+                error.AddParam("message", "Room not found");
+                await SendAsync(error.Serialize());
+                return;
+            }
+
+            // 룸 입장 시도
+            if (!room.TryAddPlayer(this, slot))
+            {
+                Console.WriteLine($"[Session {SessionId}] Join Room Failed - Cannot join room");
+                var error = new Response(protocol.Type, StateCode.FAIL);
+                error.AddParam("message", "Failed to join room (slot may be occupied)");
+                await SendAsync(error.Serialize());
+                return;
+            }
+
+            Console.WriteLine($"[Session {SessionId}] Join Room Success - RoomID: {roomId}, Slot: {slot}");
+
+            // 성공 응답
+            var response = new Response(protocol.Type, StateCode.SUCCESS);
+            response.AddStruct("roominfo", room.RoomInfo);
+            response.AddParam("chatChannelId", room.ChatChID);
+            await SendAsync(response.Serialize());
         }
 
         /// <summary>

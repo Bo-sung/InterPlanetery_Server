@@ -14,22 +14,22 @@ namespace CommonLib
         private readonly object _configLock = new object();
 
         /// <summary>
-        /// 데이터베이스 연결 문자열 (자동 생성)
+        /// 테이블 데이터베이스 연결 문자열 (자동 생성)
         /// </summary>
-        public string DatabaseConnectionString
+        public string TableDatabaseConnectionString
         {
             get
             {
                 EnsureConfigLoaded();
 
                 // ConnectionString이 직접 지정되어 있으면 그것을 사용
-                if (!string.IsNullOrEmpty(_config?.Database?.ConnectionString))
+                if (!string.IsNullOrEmpty(_config?.Databases?.Table?.ConnectionString))
                 {
-                    return _config.Database.ConnectionString;
+                    return _config.Databases.Table.ConnectionString;
                 }
 
                 // 아니면 개별 항목으로 ConnectionString 생성
-                var db = _config?.Database;
+                var db = _config?.Databases?.Table;
                 if (db != null)
                 {
                     return $"server={db.Server ?? "localhost"};" +
@@ -39,67 +39,163 @@ namespace CommonLib
                            $"port={db.Port ?? 3306};";
                 }
 
-                return GetDefaultConnectionString();
+                return GetDefaultTableConnectionString();
             }
         }
 
         /// <summary>
-        /// 데이터베이스 서버 주소
+        /// 인증 데이터베이스 연결 문자열 (자동 생성)
         /// </summary>
-        public string DatabaseServer
+        public string AuthDatabaseConnectionString
         {
             get
             {
                 EnsureConfigLoaded();
-                return _config?.Database?.Server ?? "localhost";
+
+                // ConnectionString이 직접 지정되어 있으면 그것을 사용
+                if (!string.IsNullOrEmpty(_config?.Databases?.Auth?.ConnectionString))
+                {
+                    return _config.Databases.Auth.ConnectionString;
+                }
+
+                // 아니면 개별 항목으로 ConnectionString 생성
+                var db = _config?.Databases?.Auth;
+                if (db != null)
+                {
+                    return $"server={db.Server ?? "localhost"};" +
+                           $"user={db.UserId ?? "root"};" +
+                           $"password={db.Password ?? ""};" +
+                           $"database={db.DatabaseName ?? "interplanetery_authdb_local"};" +
+                           $"port={db.Port ?? 3306};";
+                }
+
+                return GetDefaultAuthConnectionString();
             }
         }
 
         /// <summary>
-        /// 데이터베이스 사용자 ID
+        /// 데이터베이스 연결 문자열 (하위 호환성 - TableDatabaseConnectionString 반환)
         /// </summary>
-        public string DatabaseUserId
+        [Obsolete("Use TableDatabaseConnectionString or AuthDatabaseConnectionString instead")]
+        public string DatabaseConnectionString => TableDatabaseConnectionString;
+
+        /// <summary>
+        /// 테이블 데이터베이스 서버 주소
+        /// </summary>
+        public string TableDatabaseServer
         {
             get
             {
                 EnsureConfigLoaded();
-                return _config?.Database?.UserId ?? "root";
+                return _config?.Databases?.Table?.Server ?? "localhost";
             }
         }
 
         /// <summary>
-        /// 데이터베이스 비밀번호
+        /// 테이블 데이터베이스 사용자 ID
         /// </summary>
-        public string DatabasePassword
+        public string TableDatabaseUserId
         {
             get
             {
                 EnsureConfigLoaded();
-                return _config?.Database?.Password ?? "";
+                return _config?.Databases?.Table?.UserId ?? "root";
             }
         }
 
         /// <summary>
-        /// 데이터베이스 이름
+        /// 테이블 데이터베이스 비밀번호
         /// </summary>
-        public string DatabaseName
+        public string TableDatabasePassword
         {
             get
             {
                 EnsureConfigLoaded();
-                return _config?.Database?.DatabaseName ?? "interplanetery_tabledb_local";
+                return _config?.Databases?.Table?.Password ?? "";
             }
         }
 
         /// <summary>
-        /// 데이터베이스 포트
+        /// 테이블 데이터베이스 이름
         /// </summary>
-        public int DatabasePort
+        public string TableDatabaseName
         {
             get
             {
                 EnsureConfigLoaded();
-                return _config?.Database?.Port ?? 3306;
+                return _config?.Databases?.Table?.DatabaseName ?? "interplanetery_tabledb_local";
+            }
+        }
+
+        /// <summary>
+        /// 테이블 데이터베이스 포트
+        /// </summary>
+        public int TableDatabasePort
+        {
+            get
+            {
+                EnsureConfigLoaded();
+                return _config?.Databases?.Table?.Port ?? 3306;
+            }
+        }
+
+        /// <summary>
+        /// 인증 데이터베이스 서버 주소
+        /// </summary>
+        public string AuthDatabaseServer
+        {
+            get
+            {
+                EnsureConfigLoaded();
+                return _config?.Databases?.Auth?.Server ?? "localhost";
+            }
+        }
+
+        /// <summary>
+        /// 인증 데이터베이스 사용자 ID
+        /// </summary>
+        public string AuthDatabaseUserId
+        {
+            get
+            {
+                EnsureConfigLoaded();
+                return _config?.Databases?.Auth?.UserId ?? "root";
+            }
+        }
+
+        /// <summary>
+        /// 인증 데이터베이스 비밀번호
+        /// </summary>
+        public string AuthDatabasePassword
+        {
+            get
+            {
+                EnsureConfigLoaded();
+                return _config?.Databases?.Auth?.Password ?? "";
+            }
+        }
+
+        /// <summary>
+        /// 인증 데이터베이스 이름
+        /// </summary>
+        public string AuthDatabaseName
+        {
+            get
+            {
+                EnsureConfigLoaded();
+                return _config?.Databases?.Auth?.DatabaseName ?? "interplanetery_authdb_local";
+            }
+        }
+
+        /// <summary>
+        /// 인증 데이터베이스 포트
+        /// </summary>
+        public int AuthDatabasePort
+        {
+            get
+            {
+                EnsureConfigLoaded();
+                return _config?.Databases?.Auth?.Port ?? 3306;
             }
         }
 
@@ -205,13 +301,21 @@ namespace CommonLib
         /// </summary>
         private void LogCurrentConfig()
         {
-            if (_config?.Database != null)
+            if (_config?.Databases?.Table != null)
             {
-                System.Diagnostics.Debug.WriteLine($"Database.Server: {_config.Database.Server}");
-                System.Diagnostics.Debug.WriteLine($"Database.UserId: {_config.Database.UserId}");
-                System.Diagnostics.Debug.WriteLine($"Database.DatabaseName: {_config.Database.DatabaseName}");
-                System.Diagnostics.Debug.WriteLine($"Database.Port: {_config.Database.Port}");
-                System.Diagnostics.Debug.WriteLine($"Generated ConnectionString: {DatabaseConnectionString}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Table.Server: {_config.Databases.Table.Server}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Table.UserId: {_config.Databases.Table.UserId}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Table.DatabaseName: {_config.Databases.Table.DatabaseName}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Table.Port: {_config.Databases.Table.Port}");
+                System.Diagnostics.Debug.WriteLine($"Generated Table ConnectionString: {TableDatabaseConnectionString}");
+            }
+            if (_config?.Databases?.Auth != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Databases.Auth.Server: {_config.Databases.Auth.Server}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Auth.UserId: {_config.Databases.Auth.UserId}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Auth.DatabaseName: {_config.Databases.Auth.DatabaseName}");
+                System.Diagnostics.Debug.WriteLine($"Databases.Auth.Port: {_config.Databases.Auth.Port}");
+                System.Diagnostics.Debug.WriteLine($"Generated Auth ConnectionString: {AuthDatabaseConnectionString}");
             }
         }
 
@@ -335,13 +439,24 @@ namespace CommonLib
         {
             return new ConfigData
             {
-                Database = new DatabaseConfig
+                Databases = new DatabasesConfig
                 {
-                    Server = "localhost",
-                    UserId = "root",
-                    Password = "asdf1358@@",
-                    DatabaseName = "interplanetery_tabledb_local",
-                    Port = 3306
+                    Table = new DatabaseConfig
+                    {
+                        Server = "localhost",
+                        UserId = "root",
+                        Password = "asdf1358@@",
+                        DatabaseName = "interplanetery_tabledb_local",
+                        Port = 3306
+                    },
+                    Auth = new DatabaseConfig
+                    {
+                        Server = "localhost",
+                        UserId = "root",
+                        Password = "asdf1358@@",
+                        DatabaseName = "interplanetery_authdb_local",
+                        Port = 3306
+                    }
                 },
                 GameServers = new List<GameServerConfig>
                 {
@@ -408,20 +523,34 @@ namespace CommonLib
         }
 
         /// <summary>
-        /// 기본 DB 연결 문자열
+        /// 기본 테이블 DB 연결 문자열
         /// </summary>
-        private string GetDefaultConnectionString()
+        private string GetDefaultTableConnectionString()
         {
             return "server=localhost;user=root;password=asdf1358@@;database=interplanetery_tabledb_local;port=3306;";
+        }
+
+        /// <summary>
+        /// 기본 인증 DB 연결 문자열
+        /// </summary>
+        private string GetDefaultAuthConnectionString()
+        {
+            return "server=localhost;user=root;password=asdf1358@@;database=interplanetery_authdb_local;port=3306;";
         }
 
         #region Config Data Classes
 
         public class ConfigData
         {
-            public DatabaseConfig? Database { get; set; }
+            public DatabasesConfig? Databases { get; set; }
             public List<GameServerConfig>? GameServers { get; set; }
             public LoggingConfig? Logging { get; set; }
+        }
+
+        public class DatabasesConfig
+        {
+            public DatabaseConfig? Table { get; set; }
+            public DatabaseConfig? Auth { get; set; }
         }
 
         public class DatabaseConfig

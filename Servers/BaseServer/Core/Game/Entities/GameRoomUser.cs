@@ -96,8 +96,8 @@ namespace BaseServer.Core.Game.Entities
         {
             if (m_session == null)
                 return;
-            m_session.RegisterProto(ProtocolType.REQUEST_CREATE_ROOM, Handle_RequestCreateRoom);
-            m_session.RegisterProto(ProtocolType.REQUEST_JOIN_ROOM, Handle_RequestJoinRoom);
+            // Note: REQUEST_CREATE_ROOM and REQUEST_JOIN_ROOM are handled in ClientSession
+            // Only register room-specific handlers here
             m_session.RegisterProto(ProtocolType.REQUEST_LEFT_ROOM, Handle_RequestLeftRoom);
             m_session.RegisterProto(ProtocolType.REQUEST_READY, Handle_RequestReady);
         }
@@ -106,8 +106,8 @@ namespace BaseServer.Core.Game.Entities
         {
             if (m_session == null)
                 return;
-            m_session.UnRegisterProto(ProtocolType.REQUEST_CREATE_ROOM);
-            m_session.UnRegisterProto(ProtocolType.REQUEST_JOIN_ROOM);
+            // Note: REQUEST_CREATE_ROOM and REQUEST_JOIN_ROOM are handled in ClientSession
+            // Only unregister room-specific handlers here
             m_session.UnRegisterProto(ProtocolType.REQUEST_LEFT_ROOM);
             m_session.UnRegisterProto(ProtocolType.REQUEST_READY);
         }
