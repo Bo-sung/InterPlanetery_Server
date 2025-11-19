@@ -25,8 +25,8 @@ namespace BaseServer.Core.Game.Managers
         {
             m_rooms = new ConcurrentDictionary<string, GameRoom>();
 
-            // 5초마다 빈 룸 정리
-            m_cleanupTimer = new Timer(CleanupEmptyRooms, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+            // 15초마다 빈 룸 정리
+            m_cleanupTimer = new Timer(CleanupEmptyRooms, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
         }
 
         public static RoomManager Instance

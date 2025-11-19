@@ -89,7 +89,8 @@ namespace BaseServer.Core.Game.Session
                 StartTimeoutCheck();
 
                 // 메시지 수신 루프
-                _ = Task.Run(async () => await ReceiveLoop());
+                //_ = Task.Run(async () => await ReceiveLoop());
+                await ReceiveLoop();
 
 
             }
