@@ -96,7 +96,7 @@
 - ID: 10012
 - 파라미터:
   - room_name: string
-  - mapId: string
+  - mapId: int
   - is_private: boolean
 - 응답 param:
   - roomId: string
