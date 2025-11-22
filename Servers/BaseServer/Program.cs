@@ -34,24 +34,45 @@ namespace BaseServer
                 string host = config.GetValue<string>("Server:Host");
                 int port = config.GetValue<int>("Server:Port");
                 
-                if (string.IsNullOrEmpty(host))
+                IPAddress localAddr;
+                
+                // 1. IP 주소 문자열인지 먼저 확인 (0.0.0.0, 127.0.0.1 등)
+                if (IPAddress.TryParse(host, out IPAddress parsedIp))
                 {
-                    Console.WriteLine("[ERROR] Server:Host is not configured in appsettings.json");
-                    return;
+                    // 0.0.0.0인 경우 IPAddress.Any로 변환 (명시적 처리)
+                    if (parsedIp.Equals(IPAddress.Parse("0.0.0.0")))
+                    {
+                        localAddr = IPAddress.Any;
+                    }
+                    else
+                    {
+                        localAddr = parsedIp;
+                    }
                 }
-
-                IPAddress[] addresses = Dns.GetHostAddresses(host);
-                if (addresses.Length == 0)
+                else
                 {
-                    Console.WriteLine($"[ERROR] Could not resolve host: {host}");
-                    return;
+                    // 2. 호스트명인 경우 DNS 조회 (localhost 등)
+                    IPAddress[] addresses = Dns.GetHostAddresses(host);
+                    if (addresses.Length == 0)
+                    {
+                        Console.WriteLine($"[ERROR] Could not resolve host: {host}");
+                        return;
+                    }
+                    localAddr = addresses[0];
                 }
-                IPAddress localAddr = addresses[0];
 
                 server = new TcpListener(localAddr, port);
                 server.Start();
 
-                Console.WriteLine($"[Server] Listening on {host}:{port}");
+                Console.WriteLine($"[Server] Listening on {server.LocalEndpoint}");
+                
+                // 루프백 주소로 바인딩된 경우 경고 출력
+                if (IPAddress.IsLoopback(((IPEndPoint)server.LocalEndpoint).Address))
+                {
+                    Console.WriteLine("[WARNING] Server is bound to loopback address (127.0.0.1). External connections will fail.");
+                    Console.WriteLine("[WARNING] Please check 'appsettings.json' and set 'Server:Host' to '0.0.0.0'.");
+                }
+
                 Console.WriteLine("[Server] Waiting for clients to connect...");
                 Console.WriteLine();
 

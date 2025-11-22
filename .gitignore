@@ -8,6 +8,9 @@
 # Build results
 [Bb]in/
 [Oo]bj/
+publish/
+TestResults/
+.vscode/
 
 # Configuration files with sensitive data
 appsettings.json

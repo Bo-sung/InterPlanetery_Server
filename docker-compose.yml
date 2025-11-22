@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # Interplanetary Game Server
+  # ========================================
+  interplanetary-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: interplanetary-server
+    ports:
+      - "11021:11021"
+    environment:
+      # Database Configuration
+      - Database__Server=mysql-server
+      - Database__UserId=root
+      - Database__Password=changeme_password
+      - Database__DatabaseName=interplanetery_tabledb
+      - Database__Port=3306
+      
+      # Server Configuration
+      - Server__Host=0.0.0.0
+      - Server__Port=11021
+      
+      # Logging
+      - Logging__LogLevel=Info
+    
+    depends_on:
+      mysql:
+        condition: service_healthy
+    
+    restart: unless-stopped
+    
+    networks:
+      - interplanetary-network
+    
+    volumes:
+      - ./logs:/app/logs
+
+  # ========================================
+  # MySQL Database
+  # ========================================
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-server
+    environment:
+      MYSQL_ROOT_PASSWORD: changeme_password
+      MYSQL_DATABASE: interplanetery_tabledb
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    
+    ports:
+      - "3306:3306"
+    
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./Docs/#DB DDL 모음.sql:/docker-entrypoint-initdb.d/init.sql
+    
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pchangeme_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    restart: unless-stopped
+    
+    networks:
+      - interplanetary-network
+
+  # ========================================
+  # phpMyAdmin (Optional - for DB management)
+  # ========================================
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    environment:
+      PMA_HOST: mysql-server
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: changeme_password
+    
+    ports:
+      - "8080:80"
+    
+    depends_on:
+      - mysql
+    
+    restart: unless-stopped
+    
+    networks:
+      - interplanetary-network
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  interplanetary-network:
+    driver: bridge
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  mysql-data:
+    driver: local
