@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using ChatClientWPF.Models;
@@ -484,10 +484,10 @@ namespace ChatClientWPF.ViewModels
                         {
                             RoomId = room.RoomId,
                             RoomName = room.RoomName,
-                            CurrentPlayers = room.CurrentPlayers,
+                            CurrentPlayers = room.PlayerCount,
                             MaxPlayers = room.MaxPlayers,
-                            MapName = room.MapName,
-                            Status = room.Status
+                            MapName = GetMapNameById(room.MapID),
+                            Status = room.RoomState.ToString()
                         });
                     }
                 });

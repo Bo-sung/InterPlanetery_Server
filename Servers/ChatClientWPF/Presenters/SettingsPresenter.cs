@@ -1,4 +1,4 @@
-
+﻿
 using ChatClientWPF.Database;
 using ChatClientWPF.Views;
 using CommonLib;
@@ -43,11 +43,11 @@ namespace ChatClientWPF.Presenters
 
                 var config = AppConfig.Instance;
 
-                _view.DatabaseServer = config.DatabaseServer;
-                _view.DatabaseUserId = config.DatabaseUserId;
-                _view.DatabasePassword = config.DatabasePassword;
-                _view.DatabaseName = config.DatabaseName;
-                _view.DatabasePort = config.DatabasePort;
+                _view.DatabaseServer = config.TableDatabaseServer;
+                _view.DatabaseUserId = config.TableDatabaseUserId;
+                _view.DatabasePassword = config.TableDatabasePassword;
+                _view.DatabaseName = config.TableDatabaseName;
+                _view.DatabasePort = config.TableDatabasePort;
 
                 // GameServers 로드
                 if (_view is ChatClientWPF.Pages.SettingsPage settingsPage)
@@ -86,13 +86,24 @@ namespace ChatClientWPF.Presenters
                 // View에서 설정값 가져오기
                 var config = new AppConfig.ConfigData
                 {
-                    Database = new AppConfig.DatabaseConfig
+                    Databases = new AppConfig.DatabasesConfig
                     {
-                        Server = _view.DatabaseServer,
-                        UserId = _view.DatabaseUserId,
-                        Password = _view.DatabasePassword,
-                        DatabaseName = _view.DatabaseName,
-                        Port = _view.DatabasePort
+                        Table = new AppConfig.DatabaseConfig
+                        {
+                            Server = _view.DatabaseServer,
+                            UserId = _view.DatabaseUserId,
+                            Password = _view.DatabasePassword,
+                            DatabaseName = _view.DatabaseName,
+                            Port = _view.DatabasePort
+                        },
+                        Auth = new AppConfig.DatabaseConfig // Auth도 동일하게 설정 (단순화)
+                        {
+                            Server = _view.DatabaseServer,
+                            UserId = _view.DatabaseUserId,
+                            Password = _view.DatabasePassword,
+                            DatabaseName = "interplanetery_authdb_local", // 기본값 또는 별도 설정 필요
+                            Port = _view.DatabasePort
+                        }
                     },
                     GameServers = gameServers,
                     Logging = new AppConfig.LoggingConfig

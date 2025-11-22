@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using ChatClientWPF.Pages;
 using ChatClientWPF.Presenters;
 using CommonLib;
@@ -31,7 +31,7 @@ namespace ChatClientWPF.Views
 			// AppConfig 초기화 및 확인
 			System.Diagnostics.Debug.WriteLine("=== MainWindow 초기화 ===");
 			var config = CommonLib.AppConfig.Instance;
-			System.Diagnostics.Debug.WriteLine($"AppConfig loaded. DB Server: {config.DatabaseServer}");
+			System.Diagnostics.Debug.WriteLine($"AppConfig loaded. DB Server: {config.TableDatabaseServer}");
 
 			// MapService 초기화 (SingletonBase 패턴 사용) - 클라이언트에서 직접 DB 서비스 초기화 제거
 			// var gameDbRepository = new BaseServer.Database.GameDBRepository();
