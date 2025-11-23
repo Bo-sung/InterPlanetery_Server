@@ -117,4 +117,39 @@ namespace ChatClientWPF.Converters
             return value is not Visibility.Visible;
         }
     }
+    /// <summary>
+    /// Bool 값을 준비 버튼 텍스트로 변환
+    /// </summary>
+    public class BoolToReadyTextConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return (value is bool isReady && isReady) ? "준비 취소" : "준비";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Bool 값을 준비 버튼 스타일로 변환
+    /// </summary>
+    public class BoolToReadyButtonStyleConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool isReady && isReady)
+            {
+                return Application.Current.Resources["WarningButtonStyle"];
+            }
+            return Application.Current.Resources["SuccessButtonStyle"];
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

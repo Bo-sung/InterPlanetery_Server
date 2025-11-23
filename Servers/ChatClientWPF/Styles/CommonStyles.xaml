@@ -3,21 +3,23 @@
                     xmlns:converters="clr-namespace:ChatClientWPF.Converters">
 
     <!-- Color Palette (VS Code Dark Theme) -->
-    <SolidColorBrush x:Key="BackgroundBrush" Color="#FF1E1E1E"/>
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#FF252526"/>
-    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#FF2D2D30"/>
-    <SolidColorBrush x:Key="BorderBrush" Color="#FF3E3E42"/>
-    <SolidColorBrush x:Key="PrimaryBrush" Color="#FF007ACC"/>
-    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#FF1E90DA"/>
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFFFFFFF"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FFAAAAAA"/>
-    <SolidColorBrush x:Key="SuccessBrush" Color="#FF4EC9B0"/>
-    <SolidColorBrush x:Key="WarningBrush" Color="#FFFF8C00"/>
-    <SolidColorBrush x:Key="WarningHoverBrush" Color="#FFFFA500"/>
-    <SolidColorBrush x:Key="DangerBrush" Color="#FFDC143C"/>
-    <SolidColorBrush x:Key="DangerHoverBrush" Color="#FFFF1744"/>
-    <SolidColorBrush x:Key="SecondaryBrush" Color="#FF6A6A6A"/>
-    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#FF7A7A7A"/>
+    <!-- Color Palette (Based on game_room_ui.html) -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="#FF1A1F3A"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FF2A3050"/>
+    <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#FF3D4460"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="#FF3D5A80"/>
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#FF4A90E2"/>
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#FF5AA0F2"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFE0E0E0"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF98C1D9"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#FF2A9D8F"/>
+    <SolidColorBrush x:Key="SuccessHoverBrush" Color="#FF3AAD9F"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#FFFFB703"/>
+    <SolidColorBrush x:Key="WarningHoverBrush" Color="#FFFFC733"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="#FFE74C3C"/>
+    <SolidColorBrush x:Key="DangerHoverBrush" Color="#FFF75C4C"/>
+    <SolidColorBrush x:Key="SecondaryBrush" Color="#FF3D5A80"/>
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#FF4D6A90"/>
 
     <!-- Page Background -->
     <Style x:Key="PageStyle" TargetType="Page">
@@ -120,6 +122,15 @@
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{StaticResource SecondaryHoverBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SuccessButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource SuccessHoverBrush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -242,5 +253,7 @@
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
     <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
     <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+    <converters:BoolToReadyTextConverter x:Key="BoolToReadyTextConverter"/>
+    <converters:BoolToReadyButtonStyleConverter x:Key="BoolToReadyButtonStyleConverter"/>
 
 </ResourceDictionary>

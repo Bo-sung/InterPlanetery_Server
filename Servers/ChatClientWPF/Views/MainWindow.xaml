@@ -1,108 +1,45 @@
-<Window x:Class="ChatClientWPF.Views.MainWindow"
+﻿<Window x:Class="ChatClientWPF.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:pages="clr-namespace:ChatClientWPF.Pages"
+        xmlns:viewmodels="clr-namespace:ChatClientWPF.ViewModels"
+        xmlns:views="clr-namespace:ChatClientWPF.Views"
         mc:Ignorable="d"
-        Title="InterPlanetery Test Tool" Height="700" Width="1200"
+        Title="InterPlanetery Client" Height="700" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
+    
+    <Window.DataContext>
+        <viewmodels:MainViewModel/>
+    </Window.DataContext>
 
-    <Grid>
-        <!-- TabControl로 여러 테스트 페이지 관리 -->
-        <TabControl Margin="0" Background="{StaticResource BackgroundBrush}" BorderThickness="0">
-            <TabControl.Resources>
-                <!-- TabItem 스타일 -->
-                <Style TargetType="TabItem">
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="TabItem">
-                                <Border Name="Border"
-                                        Background="{StaticResource SurfaceBrush}"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1,1,1,0"
-                                        CornerRadius="3,3,0,0"
-                                        Margin="2,0,0,0"
-                                        Padding="15,10">
-                                    <ContentPresenter x:Name="ContentSite"
-                                                    VerticalAlignment="Center"
-                                                    HorizontalAlignment="Center"
-                                                    ContentSource="Header"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter TargetName="Border" Property="Background" Value="{StaticResource BackgroundBrush}"/>
-                                        <Setter TargetName="Border" Property="BorderThickness" Value="1,1,1,0"/>
-                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                        <Setter Property="FontWeight" Value="Bold"/>
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="False">
-                                        <Setter TargetName="Border" Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
-                                    </Trigger>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Border" Property="Background" Value="{StaticResource SurfaceHoverBrush}"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </TabControl.Resources>
-            <!-- Chat Test 탭 -->
-            <TabItem Header="Chat Test">
-                <Frame x:Name="ChatFrame" NavigationUIVisibility="Hidden">
-                    <Frame.Content>
-                        <pages:ChatPage/>
-                    </Frame.Content>
-                </Frame>
-            </TabItem>
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type viewmodels:LoginViewModel}">
+            <views:LoginView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:LobbyViewModel}">
+            <views:LobbyView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:RoomViewModel}">
+            <views:RoomView/>
+        </DataTemplate>
+    </Window.Resources>
 
-            <!-- Game Room 탭 -->
-            <TabItem Header="Game Room">
-                <Frame x:Name="GameRoomFrame" NavigationUIVisibility="Hidden">
-                    <Frame.Content>
-                        <pages:GameRoomPage/>
-                    </Frame.Content>
-                </Frame>
-            </TabItem>
+    <TabControl>
+        <!-- Tab 1: 게임 클라이언트 -->
+        <TabItem Header="게임 클라이언트">
+            <ContentControl Content="{Binding CurrentViewModel}"/>
+        </TabItem>
 
-            <!-- Galaxy Map 탭 -->
-            <TabItem Header="Galaxy Map">
-                <Frame x:Name="MapFrame" NavigationUIVisibility="Hidden" />
-            </TabItem>
+        <!-- Tab 2: 테이블 뷰어 -->
+        <TabItem Header="테이블 뷰어">
+            <views:TableView/>
+        </TabItem>
 
-            <!-- Table Viewer 탭 -->
-            <TabItem Header="Table Viewer">
-                <Frame x:Name="TableFrame" NavigationUIVisibility="Hidden" />
-            </TabItem>
-
-            <!-- Settings 탭 -->
-            <TabItem Header="Settings">
-                <Frame x:Name="SettingsFrame" NavigationUIVisibility="Hidden" />
-            </TabItem>
-
-            <!-- 추가 테스트 탭 (향후 확장용) -->
-            <TabItem Header="Performance Test">
-                <Grid Background="{StaticResource BackgroundBrush}">
-                    <TextBlock Text="Performance Test Page (Coming Soon...)"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontSize="18"
-                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                </Grid>
-            </TabItem>
-
-            <TabItem Header="Stress Test">
-                <Grid Background="{StaticResource BackgroundBrush}">
-                    <TextBlock Text="Stress Test Page (Coming Soon...)"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontSize="18"
-                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                </Grid>
-            </TabItem>
-        </TabControl>
-    </Grid>
+        <!-- Tab 3: 맵 렌더링 -->
+        <TabItem Header="맵 렌더링">
+            <views:MapView/>
+        </TabItem>
+    </TabControl>
 </Window>

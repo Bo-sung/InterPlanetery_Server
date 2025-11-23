@@ -9,6 +9,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Pages\**" />
+    <Compile Remove="Presenters\**" />
+    <EmbeddedResource Remove="Pages\**" />
+    <EmbeddedResource Remove="Presenters\**" />
+    <None Remove="Pages\**" />
+    <None Remove="Presenters\**" />
+    <Page Remove="Pages\**" />
+    <Page Remove="Presenters\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MySql.Data" Version="9.4.0" />
     <ProjectReference Include="..\CommonLib\CommonLib.csproj" />
   </ItemGroup>
