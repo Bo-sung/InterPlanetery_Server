@@ -1,6 +1,7 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace CommonLib
 {
@@ -25,458 +26,265 @@ namespace CommonLib
         }
     }
 
-    /// <summary>
-    /// 크로스-플랫폼 및 네트워크 통신용 프로토콜 클래스
-    /// JSON 기반 직렬화로 구조체/클래스 지원 (Newtonsoft.Json 사용)
-    /// </summary>
     public class Protocol
     {
-        // 데이터 타입 정의자
-        private const byte TYPE_BYTE = 0x10;
-        private const byte TYPE_SHORT = 0x11;
-        private const byte TYPE_INT = 0x12;
-        private const byte TYPE_LONG = 0x13;
-        private const byte TYPE_FLOAT = 0x14;
-        private const byte TYPE_DOUBLE = 0x15;
-        private const byte TYPE_BOOL = 0x16;
-        private const byte TYPE_STRING = 0x17;
-        private const byte TYPE_BYTES = 0x18;
-        private const byte TYPE_OBJECT = 0x19;  // JSON 직렬화용 객체
-
-        /// <summary>
-        /// 프로토콜 타입 (int로 정의해 다양한 값 사용)
-        /// </summary>
         public int Type { get; set; }
-
-        /// <summary>
-        /// 데이터 저장소
-        /// </summary>
-        private Dictionary<string, (byte type, object value)> m_data;
-
-        /// <summary>
-        /// 타임스탬프
-        /// </summary>
         public long Timestamp { get; set; }
+        private Dictionary<string, object> _parameters = new Dictionary<string, object>();
 
-        // 기본 생성자
-        public Protocol()
+        public Protocol(int type)
         {
-            m_data = new Dictionary<string, (byte, object)>();
+            Type = type;
             Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         }
 
-        // 타입 지정 생성자
-        public Protocol(int _type) : this()
+        public Protocol AddParam(string key, object value)
         {
-            Type = _type;
-        }
-
-        /// <summary>
-        /// 파라미터 추가 (기본 타입들 - 메서드 체이닝)
-        /// </summary>
-        public Protocol AddParam(string _key, byte _value)
-        {
-            m_data[_key] = (TYPE_BYTE, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, short _value)
-        {
-            m_data[_key] = (TYPE_SHORT, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, int _value)
-        {
-            m_data[_key] = (TYPE_INT, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, long _value)
-        {
-            m_data[_key] = (TYPE_LONG, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, float _value)
-        {
-            m_data[_key] = (TYPE_FLOAT, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, double _value)
-        {
-            m_data[_key] = (TYPE_DOUBLE, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, bool _value)
-        {
-            m_data[_key] = (TYPE_BOOL, _value);
-            return this;
-        }
-
-        public Protocol AddParam(string _key, string _value)
-        {
-            m_data[_key] = (TYPE_STRING, _value ?? "");
-            return this;
-        }
-
-        public Protocol AddParam(string _key, byte[] _value)
-        {
-            m_data[_key] = (TYPE_BYTES, _value ?? new byte[0]);
+            _parameters[key] = value;
             return this;
         }
 
         /// <summary>
-        /// 구조체 추가 (JSON 직렬화)
+        /// 구조체 추가 (서버 호환성)
+        /// JSON으로 직렬화하여 저장
         /// </summary>
-        public Protocol AddStruct<T>(string _key, T _value) where T : struct
+        public Protocol AddStruct<T>(string key, T value) where T : struct
         {
-            m_data[_key] = (TYPE_OBJECT, _value);
+            string json = JsonConvert.SerializeObject(value);
+            _parameters[key] = json;
             return this;
         }
 
         /// <summary>
-        /// 클래스/객체 추가 (JSON 직렬화)
+        /// 객체/클래스 추가 (서버 호환성)
+        /// JSON으로 직렬화하여 저장
         /// </summary>
-        public Protocol AddObject<T>(string _key, T _value) where T : class
+        public Protocol AddObject<T>(string key, T value) where T : class
         {
-            m_data[_key] = (TYPE_OBJECT, _value);
-            return this;
-        }
-
-        /// <summary>
-        /// 파라미터 값 가져오기
-        /// </summary>
-        public T GetParam<T>(string _key, T _defaultValue = default)
-        {
-            if (!m_data.ContainsKey(_key))
-                return _defaultValue;
-
-            try
+            if (value == null)
             {
-                object value = m_data[_key].value;
+                _parameters[key] = null;
+                return this;
+            }
+            string json = JsonConvert.SerializeObject(value);
+            _parameters[key] = json;
+            return this;
+        }
 
-                // JSON 문자열에서 역직렬화 (Newtonsoft.Json)
-                if (value is string jsonStr && typeof(T) != typeof(string))
+        public T GetParam<T>(string key)
+        {
+            if (_parameters.TryGetValue(key, out object value))
+            {
+                if (value is T directValue)
+                    return directValue;
+
+                // Newtonsoft.Json.Linq 타입 처리
+                if (value is Newtonsoft.Json.Linq.JToken jToken)
                 {
-                    return JsonConvert.DeserializeObject<T>(jsonStr);
+                    try
+                    {
+                        return jToken.ToObject<T>();
+                    }
+                    catch
+                    {
+                        // 변환 실패 시 계속 진행
+                    }
                 }
 
-                // JToken에서 역직렬화
-                if (value is JToken jToken)
+                // JSON 문자열인 경우 역직렬화 시도
+                if (value is string jsonString && typeof(T) != typeof(string))
                 {
-                    return jToken.ToObject<T>();
+                    try
+                    {
+                        return JsonConvert.DeserializeObject<T>(jsonString);
+                    }
+                    catch
+                    {
+                        // 역직렬화 실패 시 기본값 반환
+                    }
                 }
 
-                // 정확한 타입인 경우
-                if (value is T typedValue)
-                    return typedValue;
+                // 타입 변환 시도
+                try
+                {
+                    return (T)Convert.ChangeType(value, typeof(T));
+                }
+                catch
+                {
+                    // 변환 실패 시 기본값 반환
+                }
+            }
+            return default(T);
+        }
 
-                // 기본 타입 변환
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
+        public T GetStruct<T>(string key) where T : struct
+        {
+            if (_parameters.TryGetValue(key, out object value))
             {
-                return _defaultValue;
+                // Newtonsoft.Json.Linq 타입 처리
+                if (value is Newtonsoft.Json.Linq.JToken jToken)
+                {
+                    try
+                    {
+                        return jToken.ToObject<T>();
+                    }
+                    catch
+                    {
+                        // 변환 실패 시 계속 진행
+                    }
+                }
+
+                if (value is string jsonString)
+                {
+                    try
+                    {
+                        return JsonConvert.DeserializeObject<T>(jsonString);
+                    }
+                    catch
+                    {
+                        // 역직렬화 실패 시 기본값 반환
+                    }
+                }
+
+                // 직접 타입인 경우
+                if (value is T directValue)
+                    return directValue;
             }
+            return default(T);
         }
 
         /// <summary>
-        /// 바이트 배열 파라미터 가져오기
+        /// 객체/클래스 가져오기 (서버 호환성)
         /// </summary>
-        public byte[] GetBytes(string _key)
+        public T GetObject<T>(string key) where T : class
         {
-            if (!m_data.ContainsKey(_key))
-                return null;
-            return m_data[_key].value as byte[];
-        }
-
-        /// <summary>
-        /// 구조체 파라미터 가져오기
-        /// </summary>
-        public T GetStruct<T>(string _key) where T : struct
-        {
-            if (!m_data.ContainsKey(_key))
-                return default;
-
-            object value = m_data[_key].value;
-
-            // JSON 문자열에서 역직렬화 (Newtonsoft.Json)
-            if (value is string jsonStr)
+            if (_parameters.TryGetValue(key, out object value))
             {
-                return JsonConvert.DeserializeObject<T>(jsonStr);
+                if (value == null)
+                    return null;
+
+                // Newtonsoft.Json.Linq 타입 처리
+                if (value is Newtonsoft.Json.Linq.JToken jToken)
+                {
+                    try
+                    {
+                        return jToken.ToObject<T>();
+                    }
+                    catch
+                    {
+                        // 변환 실패 시 계속 진행
+                    }
+                }
+
+                if (value is string jsonString)
+                {
+                    try
+                    {
+                        return JsonConvert.DeserializeObject<T>(jsonString);
+                    }
+                    catch
+                    {
+                        // 역직렬화 실패 시 null 반환
+                    }
+                }
+
+                // 직접 타입인 경우
+                if (value is T directValue)
+                    return directValue;
             }
-
-            // JToken에서 역직렬화
-            if (value is JToken jToken)
-            {
-                return jToken.ToObject<T>();
-            }
-
-            if (value is T structValue)
-                return structValue;
-
-            return default;
-        }
-
-        /// <summary>
-        /// 클래스/객체 파라미터 가져오기
-        /// </summary>
-        public T GetObject<T>(string _key) where T : class
-        {
-            if (!m_data.ContainsKey(_key))
-                return null;
-
-            object value = m_data[_key].value;
-
-            // JSON 문자열에서 역직렬화 (Newtonsoft.Json)
-            if (value is string jsonStr)
-            {
-                return JsonConvert.DeserializeObject<T>(jsonStr);
-            }
-
-            // JToken에서 역직렬화
-            if (value is JToken jToken)
-            {
-                return jToken.ToObject<T>();
-            }
-
-            if (value is T classValue)
-                return classValue;
-
             return null;
         }
 
         /// <summary>
-        /// 파라미터 존재 여부 확인
+        /// 바이트 배열 가져오기 (서버 호환성)
         /// </summary>
-        public bool HasParam(string _key)
+        public byte[] GetBytes(string key)
         {
-            return m_data.ContainsKey(_key);
+            if (_parameters.TryGetValue(key, out object value))
+            {
+                return value as byte[];
+            }
+            return null;
         }
 
         /// <summary>
-        /// 네트워크 직렬화
-        /// 형식: [4바이트 크기][4바이트 타입][8바이트 타임스탬프][2바이트 데이터개수][데이터...]
+        /// 파라미터 존재 여부 확인 (서버 호환성)
         /// </summary>
+        public bool HasParam(string key)
+        {
+            return _parameters.ContainsKey(key);
+        }
+
         public byte[] Serialize()
         {
-            using (MemoryStream ms = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(ms))
+            // 간단한 바이너리 직렬화 구현
+            string jsonData = JsonConvert.SerializeObject(_parameters);
+            byte[] jsonBytes = Encoding.UTF8.GetBytes(jsonData);
+
+            byte[] result = new byte[18 + jsonBytes.Length]; // 헤더(18) + 데이터
+
+            // 전체 크기 (4바이트) - 서버는 헤더를 포함한 전체 크기를 사용함
+            BitConverter.GetBytes(result.Length).CopyTo(result, 0);
+
+            // 프로토콜 타입 (4바이트)
+            BitConverter.GetBytes(Type).CopyTo(result, 4);
+
+            // 타임스탬프 (8바이트)
+            BitConverter.GetBytes(Timestamp).CopyTo(result, 8);
+
+            // 데이터 개수 (2바이트)
+            BitConverter.GetBytes((ushort)_parameters.Count).CopyTo(result, 16);
+
+            // JSON 데이터
+            jsonBytes.CopyTo(result, 18);
+
+            return result;
+        }
+
+        public Dictionary<string, object> GetParams()
+        {
+            return _parameters;
+        }
+
+        public static Protocol Deserialize(byte[] data)
+        {
+            if (data.Length < 18) throw new ArgumentException("Invalid protocol data");
+
+            // 크기 필드 읽기 (헤더 4바이트 제외한 크기)
+            int messageSize = BitConverter.ToInt32(data, 0);
+            int type = BitConverter.ToInt32(data, 4);
+            long timestamp = BitConverter.ToInt64(data, 8);
+            ushort paramCount = BitConverter.ToUInt16(data, 16);
+
+            Protocol protocol = new Protocol(type) { Timestamp = timestamp };
+
+            // JSON 길이 계산
+            // 서버가 보내는 messageSize는 크기 필드 자신(4)을 포함
+            // messageSize = 크기(4) + 타입(4) + 타임스탬프(8) + 데이터개수(2) + JSON
+            // JSON 길이 = messageSize - 18
+            int jsonLength = messageSize - 18;
+
+            if (jsonLength > 0 && data.Length >= 18 + jsonLength)
             {
-                // 헤더 (나중에 크기 계산해서 다시 쓸 것)
-                writer.Write((int)0);        // 크기 자리 (나중에 계산)
-                writer.Write(Type);          // 프로토콜 타입 (int)
-                writer.Write(Timestamp);     // 타임스탬프
-                writer.Write((ushort)m_data.Count); // 데이터 개수
+                // 정확한 길이만큼만 JSON 파싱
+                string jsonData = Encoding.UTF8.GetString(data, 18, jsonLength);
 
-                // 데이터 직렬화
-                foreach (var kvp in m_data)
+                try
                 {
-                    // 키 계산
-                    byte[] keyBytes = Encoding.UTF8.GetBytes(kvp.Key);
-                    writer.Write((byte)keyBytes.Length);
-                    writer.Write(keyBytes);
-
-                    // 타입 및 값 계산
-                    byte dataType = kvp.Value.type;
-                    object value = kvp.Value.value;
-                    writer.Write(dataType);
-
-                    switch (dataType)
+                    var parameters = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonData);
+                    if (parameters != null)
                     {
-                        case TYPE_BYTE:
-                            writer.Write((byte)value);
-                            break;
-                        case TYPE_SHORT:
-                            writer.Write((short)value);
-                            break;
-                        case TYPE_INT:
-                            writer.Write((int)value);
-                            break;
-                        case TYPE_LONG:
-                            writer.Write((long)value);
-                            break;
-                        case TYPE_FLOAT:
-                            writer.Write((float)value);
-                            break;
-                        case TYPE_DOUBLE:
-                            writer.Write((double)value);
-                            break;
-                        case TYPE_BOOL:
-                            writer.Write((bool)value);
-                            break;
-                        case TYPE_STRING:
-                            byte[] strBytes = Encoding.UTF8.GetBytes((string)value);
-                            writer.Write((ushort)strBytes.Length);
-                            writer.Write(strBytes);
-                            break;
-                        case TYPE_BYTES:
-                            byte[] bytes = (byte[])value;
-                            writer.Write(bytes.Length);
-                            writer.Write(bytes);
-                            break;
-                        case TYPE_OBJECT:
-                            // JSON으로 직렬화 (Newtonsoft.Json)
-                            string json = JsonConvert.SerializeObject(value);
-                            byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-                            writer.Write(jsonBytes.Length);
-                            writer.Write(jsonBytes);
-                            break;
+                        protocol._parameters = parameters;
                     }
                 }
-
-                // 크기 자리 계산
-                byte[] result = ms.ToArray();
-                int totalLength = result.Length - 4;
-                BitConverter.GetBytes(totalLength).CopyTo(result, 0);
-
-                return result;
-            }
-        }
-
-        /// <summary>
-        /// 네트워크 역직렬화
-        /// </summary>
-        public static Protocol Deserialize(byte[] _bytes)
-        {
-            if (_bytes == null || _bytes.Length < 14) // 최소 헤더 크기
-                return null;
-
-            using (MemoryStream ms = new MemoryStream(_bytes))
-            using (BinaryReader reader = new BinaryReader(ms))
-            {
-                // 헤더 읽기
-                int length = reader.ReadInt32();
-                int type = reader.ReadInt32();
-                long timestamp = reader.ReadInt64();
-                ushort dataCount = reader.ReadUInt16();
-
-                Protocol protocol = new Protocol(type)
+                catch (Exception ex)
                 {
-                    Timestamp = timestamp
-                };
-
-                // 데이터 읽기
-                for (int i = 0; i < dataCount; i++)
-                {
-                    // 키 읽기
-                    byte keyLength = reader.ReadByte();
-                    byte[] keyBytes = reader.ReadBytes(keyLength);
-                    string key = Encoding.UTF8.GetString(keyBytes);
-
-                    // 타입 및 값 읽기
-                    byte dataType = reader.ReadByte();
-
-                    switch (dataType)
-                    {
-                        case TYPE_BYTE:
-                            protocol.m_data[key] = (dataType, reader.ReadByte());
-                            break;
-                        case TYPE_SHORT:
-                            protocol.m_data[key] = (dataType, reader.ReadInt16());
-                            break;
-                        case TYPE_INT:
-                            protocol.m_data[key] = (dataType, reader.ReadInt32());
-                            break;
-                        case TYPE_LONG:
-                            protocol.m_data[key] = (dataType, reader.ReadInt64());
-                            break;
-                        case TYPE_FLOAT:
-                            protocol.m_data[key] = (dataType, reader.ReadSingle());
-                            break;
-                        case TYPE_DOUBLE:
-                            protocol.m_data[key] = (dataType, reader.ReadDouble());
-                            break;
-                        case TYPE_BOOL:
-                            protocol.m_data[key] = (dataType, reader.ReadBoolean());
-                            break;
-                        case TYPE_STRING:
-                            ushort strLength = reader.ReadUInt16();
-                            byte[] strBytes = reader.ReadBytes(strLength);
-                            protocol.m_data[key] = (dataType, Encoding.UTF8.GetString(strBytes));
-                            break;
-                        case TYPE_BYTES:
-                            int bytesLength = reader.ReadInt32();
-                            byte[] bytesData = reader.ReadBytes(bytesLength);
-                            protocol.m_data[key] = (dataType, bytesData);
-                            break;
-                        case TYPE_OBJECT:
-                            int jsonLength = reader.ReadInt32();
-                            byte[] jsonBytes = reader.ReadBytes(jsonLength);
-                            string json = Encoding.UTF8.GetString(jsonBytes);
-                            // JSON 문자열로 저장 (나중에 역직렬화할 타입으로 변환)
-                            protocol.m_data[key] = (dataType, json);
-                            break;
-                    }
+                    Console.WriteLine($"[Protocol] JSON 파싱 오류: {ex.Message}\nJSON: {jsonData}\n크기: messageSize={messageSize}, jsonLength={jsonLength}, dataLength={data.Length}");
+                    throw;
                 }
-
-                return protocol;
             }
-        }
 
-        /// <summary>
-        /// 디버깅용 문자열 표현
-        /// </summary>
-        public override string ToString()
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"[Protocol] Type: {Type}, Timestamp: {Timestamp}");
-            foreach (var kvp in m_data)
-            {
-                sb.AppendLine($"  {kvp.Key}: {kvp.Value.value} (Type: 0x{kvp.Value.type:X2})");
-            }
-            return sb.ToString();
-        }
-    }
-
-
-
-    // ========== 사용 예제 ==========
-
-    // 구조체 예제
-    public struct PlayerData
-    {
-        public string PlayerId { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
-        public int Hp { get; set; }
-        public bool IsAlive { get; set; }
-
-        public override string ToString()
-        {
-            return $"Player({PlayerId}): Pos({X},{Y}), HP={Hp}, Alive={IsAlive}";
-        }
-    }
-
-    public struct Vector3Data
-    {
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Z { get; set; }
-
-        public override string ToString()
-        {
-            return $"Vector3({X}, {Y}, {Z})";
-        }
-    }
-
-    public class GameSettings
-    {
-        public string MapName { get; set; }
-        public int TimeLimit { get; set; }
-        public Dictionary<string, int> Scores { get; set; }
-
-        public GameSettings()
-        {
-            Scores = new Dictionary<string, int>();
-        }
-
-        public override string ToString()
-        {
-            return $"Settings: Map={MapName}, Time={TimeLimit}s";
+            return protocol;
         }
     }
 }

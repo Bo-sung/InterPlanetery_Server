@@ -1,4 +1,5 @@
 ﻿using BaseServer.Core.Game;
+using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
 using CommonLib;
 using CommonLib.Commands;
@@ -72,6 +73,8 @@ namespace BaseServer.Core.Game.Entities
         public List<int> Fleets { get { return m_fleets; } }
         public List<int> Planets { get { return m_planets; } }
         public Queue<int> ProductionOrder { get { return m_productionOrder; } }
+
+        public System.Action OnUserReady;
         #endregion
 
         public GamePlayer()
@@ -110,6 +113,7 @@ namespace BaseServer.Core.Game.Entities
             if (clientSession == null)
                 return;
             clientSession.RegisterProto(ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
+            clientSession.RegisterProto(ProtocolType.REQUEST_GAME_CL_READY, HandleUserReady);
         }
 
         protected virtual void UnRegistorProtos()
@@ -117,6 +121,7 @@ namespace BaseServer.Core.Game.Entities
             if (clientSession == null)
                 return;
             clientSession.UnRegisterProto(ProtocolType.SUBMIT_COMMAND);
+            clientSession.UnRegisterProto(ProtocolType.REQUEST_GAME_CL_READY);
         }
 
         /// <summary>
@@ -157,6 +162,26 @@ namespace BaseServer.Core.Game.Entities
                 await commandSender.SendCommandToGame(command);
             }
         }
+
+        public async Task HandleUserReady(Protocol _protocol)
+        {
+            OnUserReady?.Invoke();
+        }
+
+        public async Task Async_SendGameSet(MapData map)
+        {
+            if (clientSession == null)
+                return;
+
+            Protocol result = new Protocol(ProtocolType.GAME_SET);
+            result.AddObject("mapinfo", map.mapInfoData);
+            result.AddObject("mapplanetinfo", map.mapInfoData);
+            result.AddObject("planets", map.mapInfoData);
+            result.AddObject("routes", map.mapInfoData);
+
+            await clientSession.SendAsync(result.Serialize());
+        }
+
         #endregion
 
         #region 게임 로직

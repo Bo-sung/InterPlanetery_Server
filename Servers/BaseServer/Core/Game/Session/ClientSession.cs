@@ -5,6 +5,7 @@ using BaseServer.Network;
 using CommonLib;
 using MySqlX.XDevAPI;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -38,18 +39,34 @@ namespace BaseServer.Core.Game.Session
         // 프로토콜 핸들러
         protected ProtocolHandler m_protocolHandler;
 
+        // 세션 생성 시간 기록용
+        private readonly Stopwatch m_sessionTimer;
+
         public ClientSession(TcpClient _client)
         {
             TcpClient = _client;
+            TcpClient.NoDelay = true;
+
             m_stream = _client.GetStream();
             SessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
             m_lastActivityTime = DateTime.UtcNow;
+
+            // 타이머 시작
+            m_sessionTimer = Stopwatch.StartNew();
 
             // 프로토콜 핸들러 초기화 및 등록
             m_protocolHandler = new ProtocolHandler();
             RegisterProtocolHandlers();
 
-            Console.WriteLine($"[Session {SessionId}] Created");
+            LogWithTimestamp($"[Session {SessionId}] Created");
+        }
+
+        // 타임스탬프 로그 헬퍼 메서드
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            var elapsed = m_sessionTimer?.ElapsedMilliseconds ?? 0;
+            Console.WriteLine($"[{timestamp}] [{elapsed,6}ms] {message}");
         }
 
         /// <summary>
@@ -85,24 +102,19 @@ namespace BaseServer.Core.Game.Session
         {
             try
             {
-                // 타임아웃 체크 타이머 시작
                 StartTimeoutCheck();
-
-                // 메시지 수신 루프
-                //_ = Task.Run(async () => await ReceiveLoop());
                 await ReceiveLoop();
-
-
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[Session {SessionId}] Error: {e.Message}");
+                LogWithTimestamp($"[Session {SessionId}] Error: {e.Message}");
             }
             finally
             {
                 Cleanup();
             }
         }
+
 
         /// <summary>
         /// 타임아웃 체크 시작
@@ -113,9 +125,6 @@ namespace BaseServer.Core.Game.Session
                 TIMEOUT_CHECK_INTERVAL, TIMEOUT_CHECK_INTERVAL);
         }
 
-        /// <summary>
-        /// 타임아웃 체크 콜백
-        /// </summary>
         private void CheckTimeout(object? _state)
         {
             if (!m_isConnected)
@@ -125,7 +134,7 @@ namespace BaseServer.Core.Game.Session
 
             if (timeSinceLastActivity.TotalSeconds > TIMEOUT_SECONDS)
             {
-                Console.WriteLine($"[Session {SessionId}] Timeout detected. Last activity: {timeSinceLastActivity.TotalSeconds:F1}s ago");
+                LogWithTimestamp($"[Session {SessionId}] Timeout detected. Last activity: {timeSinceLastActivity.TotalSeconds:F1}s ago");
                 Disconnect();
             }
         }
@@ -145,75 +154,85 @@ namespace BaseServer.Core.Game.Session
         {
             byte[] lengthBuffer = new byte[4];
 
-            while (m_isConnected)
+            try
             {
-                try
+                while (m_isConnected)
                 {
-                    // TCP 연결 상태 체크
-                    if (!IsSocketConnected())
-                    {
-                        Console.WriteLine($"[Session {SessionId}] Socket disconnected");
-                        break;
-                    }
+                    LogWithTimestamp($"[Session {SessionId}] ReceiveLoop iteration started");
 
-                    // 1. 메시지 길이 읽기 (4바이트)
+                    // 1단계: 전체 메시지 크기 읽기 (크기 필드 포함)
                     int bytesRead = await m_stream.ReadAsync(lengthBuffer, 0, 4);
                     if (bytesRead == 0)
                     {
-                        Console.WriteLine($"[Session {SessionId}] Client disconnected");
+                        LogWithTimestamp($"[Session {SessionId}] Connection closed");
                         break;
                     }
 
-                    UpdateLastActivity(); // 활동 갱신
+                    int totalMessageSize = BitConverter.ToInt32(lengthBuffer, 0);
+                    LogWithTimestamp($"[Session {SessionId}] Total message size: {totalMessageSize}");
 
-                    int messageLength = BitConverter.ToInt32(lengthBuffer, 0);
+                    UpdateLastActivity();
 
-                    // 메시지 길이 검증 (비정상적으로 큰 메시지 방어)
-                    if (messageLength <= 0 || messageLength > 1024 * 1024) // 1MB 제한
+                    // 검증
+                    if (totalMessageSize < 18 || totalMessageSize > 1024 * 1024)
                     {
-                        Console.WriteLine($"[Session {SessionId}] Invalid message length: {messageLength}");
+                        LogWithTimestamp($"[Session {SessionId}] Invalid message size: {totalMessageSize}");
                         break;
                     }
 
-                    // 2. 전체 메시지 읽기
-                    byte[] messageBuffer = new byte[messageLength + 4];
-                    Array.Copy(lengthBuffer, 0, messageBuffer, 0, 4);
+                    // 2단계: 전체 메시지 읽기 (크기 필드 포함!)
+                    byte[] fullMessage = new byte[totalMessageSize];
 
-                    int totalRead = 0;
-                    while (totalRead < messageLength)
+                    // 이미 읽은 4바이트(크기) 복사
+                    lengthBuffer.CopyTo(fullMessage, 0);
+
+                    // 나머지 읽기
+                    int remainingBytes = totalMessageSize - 4;
+                    int totalBytesRead = 0;
+
+                    while (totalBytesRead < remainingBytes)
                     {
-                        bytesRead = await m_stream.ReadAsync(messageBuffer, 4 + totalRead, messageLength - totalRead);
+                        bytesRead = await m_stream.ReadAsync(
+                            fullMessage,
+                            4 + totalBytesRead,  // 크기(4) 이후부터
+                            remainingBytes - totalBytesRead
+                        );
+
                         if (bytesRead == 0)
                         {
-                            Console.WriteLine($"[Session {SessionId}] Connection lost while reading message");
-                            return;
+                            LogWithTimestamp($"[Session {SessionId}] Connection lost while reading message");
+                            break;
                         }
-                        totalRead += bytesRead;
+                        totalBytesRead += bytesRead;
                     }
 
-                    // 3. 프로토콜 역직렬화 및 처리
-                    Protocol? protocol = Protocol.Deserialize(messageBuffer);
+                    if (totalBytesRead < remainingBytes)
+                    {
+                        LogWithTimestamp($"[Session {SessionId}] Incomplete message received");
+                        break;
+                    }
+
+                    // 역직렬화 (전체 메시지 전달)
+                    Protocol? protocol = Protocol.Deserialize(fullMessage);
                     if (protocol != null)
                     {
+                        LogWithTimestamp($"[Session {SessionId}] Protocol Type: {protocol.Type}");
                         await HandleProtocol(protocol);
+                        LogWithTimestamp($"[Session {SessionId}] Protocol handled, continuing loop");
+                    }
+                    else
+                    {
+                        LogWithTimestamp($"[Session {SessionId}] Protocol deserialization failed");
                     }
                 }
-                catch (IOException)
-                {
-                    Console.WriteLine($"[Session {SessionId}] Connection lost (IOException)");
-                    break;
-                }
-                catch (SocketException)
-                {
-                    Console.WriteLine($"[Session {SessionId}] Connection lost (SocketException)");
-                    break;
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"[Session {SessionId}] Error in receive loop: {e.Message}");
-                    break;
-                }
             }
+            catch (Exception e)
+            {
+                LogWithTimestamp($"[Session {SessionId}] ReceiveLoop error: {e.Message}");
+            }
+
+            LogWithTimestamp($"[Session {SessionId}] ReceiveLoop exited");
+            Disconnect();
         }
 
         /// <summary>
@@ -277,7 +296,7 @@ namespace BaseServer.Core.Game.Session
             // 파라미터 검증
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                Console.WriteLine($"[Session {SessionId}] Register Failed - Invalid parameters (username or password is empty)");
+                LogWithTimestamp($"[Session {SessionId}] Register Failed - Invalid parameters (username or password is empty)");
                 var errorResponse = new Response(protocol.Type, StateCode.FAIL);
                 errorResponse.AddParam("message", "Username and password are required");
                 await SendAsync(errorResponse.Serialize());
@@ -287,7 +306,7 @@ namespace BaseServer.Core.Game.Session
             // 사용자명 길이 검증 (예: 3-20자)
             if (username.Length < 3 || username.Length > 20)
             {
-                Console.WriteLine($"[Session {SessionId}] Register Failed - Invalid username length (username: {username})");
+                LogWithTimestamp($"[Session {SessionId}] Register Failed - Invalid username length (username: {username})");
                 var errorResponse = new Response(protocol.Type, StateCode.FAIL);
                 errorResponse.AddParam("message", "Username must be between 3 and 20 characters");
                 await SendAsync(errorResponse.Serialize());
@@ -297,7 +316,7 @@ namespace BaseServer.Core.Game.Session
             // 비밀번호 길이 검증 (예: 4-50자)
             if (password.Length < 4 || password.Length > 50)
             {
-                Console.WriteLine($"[Session {SessionId}] Register Failed - Invalid password length");
+                LogWithTimestamp($"[Session {SessionId}] Register Failed - Invalid password length");
                 var errorResponse = new Response(protocol.Type, StateCode.FAIL);
                 errorResponse.AddParam("message", "Password must be between 4 and 50 characters");
                 await SendAsync(errorResponse.Serialize());
@@ -308,7 +327,7 @@ namespace BaseServer.Core.Game.Session
             var authDB = DBManager.Instance.Auth;
             if (authDB == null)
             {
-                Console.WriteLine($"[Session {SessionId}] Register Failed - Authentication database unavailable");
+                LogWithTimestamp($"[Session {SessionId}] Register Failed - Authentication database unavailable");
                 var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
                 errorResponse.AddParam("message", "Authentication service unavailable");
                 await SendAsync(errorResponse.Serialize());
@@ -319,7 +338,7 @@ namespace BaseServer.Core.Game.Session
             bool registerSuccess = authDB.RegisterUser(username, password);
             if (!registerSuccess)
             {
-                Console.WriteLine($"[Session {SessionId}] Register Failed - User already exists or database error (username: {username})");
+                LogWithTimestamp($"[Session {SessionId}] Register Failed - User already exists or database error (username: {username})");
                 var errorResponse = new Response(protocol.Type, StateCode.FAIL);
                 errorResponse.AddParam("message", "Username already exists or registration failed");
                 await SendAsync(errorResponse.Serialize());
@@ -327,7 +346,7 @@ namespace BaseServer.Core.Game.Session
             }
 
             // 회원가입 성공
-            Console.WriteLine($"[Session {SessionId}] Register Success - UserName: {username}");
+            LogWithTimestamp($"[Session {SessionId}] Register Success - UserName: {username}");
 
             var response = new Response(protocol.Type, StateCode.SUCCESS);
             response.AddParam("message", "Registration successful. Please login.");
@@ -340,13 +359,13 @@ namespace BaseServer.Core.Game.Session
         // 응답 param: username (string), password (string)
         private async Task Handle_RequestRegisterAuto(Protocol protocol)
         {
-            Console.WriteLine($"[Session {SessionId}] Auto Register Request");
+            LogWithTimestamp($"[Session {SessionId}] Auto Register Request");
 
             // DB 접근 가능 여부 확인
             var authDB = DBManager.Instance.Auth;
             if (authDB == null)
             {
-                Console.WriteLine($"[Session {SessionId}] Auto Register Failed - Authentication database unavailable");
+                LogWithTimestamp($"[Session {SessionId}] Auto Register Failed - Authentication database unavailable");
                 var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
                 errorResponse.AddParam("message", "Authentication service unavailable");
                 await SendAsync(errorResponse.Serialize());
@@ -378,12 +397,12 @@ namespace BaseServer.Core.Game.Session
                     }
                 }
 
-                Console.WriteLine($"[Session {SessionId}] Auto Register - Username collision, retrying... ({i + 1}/{maxRetries})");
+                LogWithTimestamp($"[Session {SessionId}] Auto Register - Username collision, retrying... ({i + 1}/{maxRetries})");
             }
 
             if (!success)
             {
-                Console.WriteLine($"[Session {SessionId}] Auto Register Failed - Could not generate unique username after {maxRetries} attempts");
+                LogWithTimestamp($"[Session {SessionId}] Auto Register Failed - Could not generate unique username after {maxRetries} attempts");
                 var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
                 errorResponse.AddParam("message", "Failed to generate account. Please try again.");
                 await SendAsync(errorResponse.Serialize());
@@ -391,7 +410,7 @@ namespace BaseServer.Core.Game.Session
             }
 
             // 회원가입 성공
-            Console.WriteLine($"[Session {SessionId}] Auto Register Success - UserName: {username}");
+            LogWithTimestamp($"[Session {SessionId}] Auto Register Success - UserName: {username}");
 
             var response = new Response(protocol.Type, StateCode.SUCCESS);
             response.AddParam("username", username);
@@ -402,13 +421,16 @@ namespace BaseServer.Core.Game.Session
 
         private async Task Handle_RequestLogin(Protocol protocol)
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            LogWithTimestamp($"━━━ [로그인 처리 시작] ━━━");
+
             var username = protocol.GetParam<string>("username");
             var password = protocol.GetParam<string>("password");
 
             // 파라미터 검증
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                Console.WriteLine($"[Session {SessionId}] Login Failed - Invalid parameters (username or password is empty)");
+                LogWithTimestamp($"[Session {SessionId}] Login Failed - Invalid parameters (username or password is empty)");
                 var errorResponse = new Response(protocol.Type, StateCode.AUTH_FAILURE);
                 errorResponse.AddParam("message", "Username and password are required");
                 await SendAsync(errorResponse.Serialize());
@@ -420,7 +442,7 @@ namespace BaseServer.Core.Game.Session
             var authDB = DBManager.Instance.Auth;
             if (authDB == null)
             {
-                Console.WriteLine($"[Session {SessionId}] Login Failed - Authentication database unavailable");
+                LogWithTimestamp($"[Session {SessionId}] Login Failed - Authentication database unavailable");
                 var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
                 errorResponse.AddParam("message", "Authentication service unavailable");
                 await SendAsync(errorResponse.Serialize());
@@ -432,7 +454,7 @@ namespace BaseServer.Core.Game.Session
             var userinfo = authDB.AuthenticateUser(username, password);
             if (userinfo == null)
             {
-                Console.WriteLine($"[Session {SessionId}] Login Failed - Invalid credentials (username: {username})");
+                LogWithTimestamp($"[Session {SessionId}] Login Failed - Invalid credentials (username: {username})");
                 var errorResponse = new Response(protocol.Type, StateCode.AUTH_FAILURE);
                 errorResponse.AddParam("message", "Invalid username or password");
                 await SendAsync(errorResponse.Serialize());
@@ -442,11 +464,21 @@ namespace BaseServer.Core.Game.Session
             
             // 인증 성공 - UserInfo 설정
             m_userInfo = userinfo.Value;
-            Console.WriteLine($"[Session {SessionId}] Login Success - UserId: {m_userInfo.UserId}, UserName: {m_userInfo.UserName}");
+            LogWithTimestamp($"[Session {SessionId}] Login Success - UserId: {m_userInfo.UserId}, UserName: {m_userInfo.UserName}");
 
             var response = new Response(protocol.Type, StateCode.SUCCESS);
             response.AddParam("sessionId", SessionId);
+
+            LogWithTimestamp($"━━━ [응답 전송] ━━━");
+            LogWithTimestamp($"[Session {SessionId}] Response Type: {response.Type}");
+            LogWithTimestamp($"[Session {SessionId}] protoId: {protocol.Type}");
+            LogWithTimestamp($"[Session {SessionId}] Processing Time: {sw.ElapsedMilliseconds}ms");
+
+            byte[] responseData = response.Serialize();
+            LogWithTimestamp($"[Session {SessionId}] Response Size: {responseData.Length} bytes");
+
             await SendAsync(response.Serialize());
+            LogWithTimestamp($"[Session {SessionId}] 전송 완료: {sw.ElapsedMilliseconds}ms");
         }
 
         // REQUEST_LOGOUT
@@ -455,7 +487,7 @@ namespace BaseServer.Core.Game.Session
         // 응답 param: 없음
         private async Task Handle_RequestLogout(Protocol protocol)
         {
-            Console.WriteLine($"[Session {SessionId}] Logout Request: UserName={m_userInfo.UserName}");
+            LogWithTimestamp($"[Session {SessionId}] Logout Request: UserName={m_userInfo.UserName}");
 
             // UserInfo 초기화
             m_userInfo = default;
@@ -464,7 +496,7 @@ namespace BaseServer.Core.Game.Session
             var response = new Response(protocol.Type, StateCode.SUCCESS);
             await SendAsync(response.Serialize());
 
-            Console.WriteLine($"[Session {SessionId}] Logout Success");
+            LogWithTimestamp($"[Session {SessionId}] Logout Success");
 
             // 연결 종료 (로그아웃 후 재로그인 필요)
             Disconnect();
@@ -478,13 +510,13 @@ namespace BaseServer.Core.Game.Session
         {
             int page = protocol.GetParam<int>("Page");
 
-            Console.WriteLine($"[Session {SessionId}] Join Lobby Request - UserName: {m_userInfo.UserName}, Page: {page}");
+            LogWithTimestamp($"[Session {SessionId}] Join Lobby Request - UserName: {m_userInfo.UserName}, Page: {page}");
 
             // RoomManager에서 방 리스트 가져오기
             var roomList = RoomManager.Instance.GetRoomList(page);
             int totalRoomCount = RoomManager.Instance.GetRoomList().Length;
 
-            Console.WriteLine($"[Session {SessionId}] Join Lobby Success - Total Rooms: {totalRoomCount}, Page: {page}, Rooms in Page: {roomList.Length}");
+            LogWithTimestamp($"[Session {SessionId}] Join Lobby Success - Total Rooms: {totalRoomCount}, Page: {page}, Rooms in Page: {roomList.Length}");
 
             // 응답 생성
             var response = new Response(protocol.Type, StateCode.SUCCESS);
@@ -501,12 +533,12 @@ namespace BaseServer.Core.Game.Session
         // 응답 param: roomList (RoomInfo[])
         private async Task Handle_RefreshLobby(Protocol protocol)
         {
-            Console.WriteLine($"[Session {SessionId}] Refresh Lobby Request - UserName: {m_userInfo.UserName}");
+            LogWithTimestamp($"[Session {SessionId}] Refresh Lobby Request - UserName: {m_userInfo.UserName}");
 
             // RoomManager에서 모든 방 리스트 가져오기
             var roomList = RoomManager.Instance.GetRoomList();
 
-            Console.WriteLine($"[Session {SessionId}] Refresh Lobby Success - Total Rooms: {roomList.Length}");
+            LogWithTimestamp($"[Session {SessionId}] Refresh Lobby Success - Total Rooms: {roomList.Length}");
 
             // 응답 생성
             var response = new Response(protocol.Type, StateCode.SUCCESS);
@@ -521,20 +553,20 @@ namespace BaseServer.Core.Game.Session
         // 응답 param: roomId (string), slot (int)
         private async Task Handle_RequestCreateRoom(Protocol protocol)
         {
-            Console.WriteLine($"[Session {SessionId}] Create Room Request - UserName: {m_userInfo.UserName}");
+            LogWithTimestamp($"[Session {SessionId}] Create Room Request - UserName: {m_userInfo.UserName}");
 
             // 파라미터 불러오기
             string roomName = protocol.GetParam<string>("roomName");
             int mapId = protocol.GetParam<int>("mapId");
             bool isPrivate = protocol.GetParam<bool>("isPrivate");
 
-            Console.WriteLine($"[Session {SessionId}] Room Parameters - Name: {roomName}, MapID: {mapId}, Private: {isPrivate}");
+            LogWithTimestamp($"[Session {SessionId}] Room Parameters - Name: {roomName}, MapID: {mapId}, Private: {isPrivate}");
 
             // 방 생성
             var room = RoomManager.Instance.CreateRoom();
             if (room == null)
             {
-                Console.WriteLine($"[Session {SessionId}] Create Room Failed - Room creation failed");
+                LogWithTimestamp($"[Session {SessionId}] Create Room Failed - Room creation failed");
                 var errorResponse = new Response(protocol.Type, StateCode.SERVER_ERROR);
                 errorResponse.AddParam("message", "Failed to create room");
                 await SendAsync(errorResponse.Serialize());
@@ -543,7 +575,7 @@ namespace BaseServer.Core.Game.Session
 
             room.UpdateRoomInfo(roomName, mapId);
 
-            Console.WriteLine($"[Session {SessionId}] Create Room Success - RoomID: {room.RoomId}");
+            LogWithTimestamp($"[Session {SessionId}] Create Room Success - RoomID: {room.RoomId}");
 
             // 성공 응답
             var response = new Response(protocol.Type, StateCode.SUCCESS);
@@ -559,19 +591,19 @@ namespace BaseServer.Core.Game.Session
         // 응답 param: roominfo (RoomInfo), chatChannelId (int)
         private async Task Handle_RequestJoinRoom(Protocol protocol)
         {
-            Console.WriteLine($"[Session {SessionId}] Join Room Request - UserName: {m_userInfo.UserName}");
+            LogWithTimestamp($"[Session {SessionId}] Join Room Request - UserName: {m_userInfo.UserName}");
 
             // 파라미터 불러오기
             int userId = protocol.GetParam<int>("userId");
             string roomId = protocol.GetParam<string>("roomId");
             int slot = protocol.GetParam<int>("slot");
 
-            Console.WriteLine($"[Session {SessionId}] Room Parameters - RoomID: {roomId}, Slot: {slot}");
+            LogWithTimestamp($"[Session {SessionId}] Room Parameters - RoomID: {roomId}, Slot: {slot}");
 
             // 슬롯 범위 검증
             if (slot >= GameRoom.MaxPlayers || slot < 0)
             {
-                Console.WriteLine($"[Session {SessionId}] Join Room Failed - Invalid slot: {slot}");
+                LogWithTimestamp($"[Session {SessionId}] Join Room Failed - Invalid slot: {slot}");
                 var error = new Response(protocol.Type, StateCode.FAIL);
                 error.AddParam("message", "Invalid slot number");
                 await SendAsync(error.Serialize());
@@ -582,7 +614,7 @@ namespace BaseServer.Core.Game.Session
             var room = RoomManager.Instance.GetRoom(roomId);
             if (room == null)
             {
-                Console.WriteLine($"[Session {SessionId}] Join Room Failed - Room not found: {roomId}");
+                LogWithTimestamp($"[Session {SessionId}] Join Room Failed - Room not found: {roomId}");
                 var error = new Response(protocol.Type, StateCode.NO_RESOURCE);
                 error.AddParam("message", "Room not found");
                 await SendAsync(error.Serialize());
@@ -592,14 +624,14 @@ namespace BaseServer.Core.Game.Session
             // 룸 입장 시도
             if (!room.TryAddPlayer(this, slot))
             {
-                Console.WriteLine($"[Session {SessionId}] Join Room Failed - Cannot join room");
+                LogWithTimestamp($"[Session {SessionId}] Join Room Failed - Cannot join room");
                 var error = new Response(protocol.Type, StateCode.FAIL);
                 error.AddParam("message", "Failed to join room (slot may be occupied)");
                 await SendAsync(error.Serialize());
                 return;
             }
 
-            Console.WriteLine($"[Session {SessionId}] Join Room Success - RoomID: {roomId}, Slot: {slot}");
+            LogWithTimestamp($"[Session {SessionId}] Join Room Success - RoomID: {roomId}, Slot: {slot}");
 
             // 성공 응답
             var response = new Response(protocol.Type, StateCode.SUCCESS);
@@ -635,6 +667,8 @@ namespace BaseServer.Core.Game.Session
                     m_stream.Write(_data, 0, _data.Length);
                     m_stream.Flush();
                 }
+
+                UpdateLastActivity(); // 전송 시에도 활동 시간 갱신
             }
             catch (Exception e)
             {
@@ -652,7 +686,7 @@ namespace BaseServer.Core.Game.Session
                 return;
 
             m_isConnected = false;
-            Console.WriteLine($"[Session {SessionId}] Disconnecting...");
+            LogWithTimestamp($"[Session {SessionId}] Disconnecting...");
 
             try
             {
@@ -662,7 +696,7 @@ namespace BaseServer.Core.Game.Session
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[Session {SessionId}] Error during disconnect: {e.Message}");
+                LogWithTimestamp($"[Session {SessionId}] Error during disconnect: {e.Message}");
             }
         }
 
@@ -679,7 +713,7 @@ namespace BaseServer.Core.Game.Session
             }
 
             Disconnect();
-            Console.WriteLine($"[Session {SessionId}] Cleaned up");
+            LogWithTimestamp($"[Session {SessionId}] Cleaned up");
         }
     }
 }
