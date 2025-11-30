@@ -577,10 +577,14 @@ namespace BaseServer.Core.Game.Session
 
             LogWithTimestamp($"[Session {SessionId}] Create Room Success - RoomID: {room.RoomId}");
 
+            // RoomManager에서 모든 방 리스트 가져오기
+            var roomList = RoomManager.Instance.GetRoomList();
+
             // 성공 응답
             var response = new Response(protocol.Type, StateCode.SUCCESS);
             response.AddParam("roomId", room.RoomId);
             response.AddParam("slot", room.NextSlot());
+            response.AddObject("roomList", roomList);
 
             await SendAsync(response.Serialize());
         }
