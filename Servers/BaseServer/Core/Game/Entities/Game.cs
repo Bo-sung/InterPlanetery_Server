@@ -5,11 +5,84 @@ using CommonLib.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using static BaseServer.Core.Game.Entities.GameState;
 
 namespace BaseServer.Core.Game.Entities
 {
+
+    /// <summary>
+    /// 게임 상태 클래스. 매 틱마다 클라 전송.
+    /// </summary>
+    public class GameState
+    {
+        public class Player
+        {
+            public int id = -1;
+            public FleetInfo[] fleets;
+        }
+
+        public class FleetInfo
+        {
+            public CommonLib.Vector2 position;
+            public int state = 0;   // 0 = Idle, 1 = battle. 2 = move
+            public float HP = 0;
+            public CommonLib.Vector2 target;    // idle일때는 무시
+        }
+
+        public class Planet
+        {
+            public int owner = -1;
+            public float conquestProgress = 0;
+        }
+
+        public int state = 0; // 0 = 준비. 1 = 진행중, 2 = 종료
+
+        public Player[] players;
+        public Planet[] planets;
+
+        public GameState(GameMap gameMap, GamePlayer[] playerarr, Dictionary<long, Fleet> fleets, int curr_state)
+        {
+            List<Planet> planetList = new List<Planet>();
+            foreach (var item in gameMap.Planets)
+            {
+                Planet p = new Planet();
+                p.owner = item.OwnerId;
+                p.conquestProgress = item.ConquestProgress;
+                planetList.Add(p);
+            }
+
+            planets = planetList.ToArray();
+
+            List<Player> playerList = new List<Player>();
+            foreach (var item in playerarr)
+            {
+                Player p = new Player();
+                p.id = item.ID;
+
+                List<FleetInfo> fleetList = new List<FleetInfo>();
+
+                // fleets 에서 owner Id와 현재 Id와 매치되는것들만 추출
+                foreach (var fitem in fleets.Values.ToList().FindAll(x => x.Owner == p.id))
+                {
+                    FleetInfo fleet = new FleetInfo();
+                    fleet.state = (int)fitem.State;
+                    fleet.HP = fitem.CurHealth;
+                    fleet.position = fitem.Position;
+                    fleet.target = fitem.MoveTarget;
+                    fleetList.Add(fleet);
+                }
+                p.fleets = fleetList.ToArray();
+                playerList.Add(p);
+            }
+            players = playerList.ToArray();
+            state = curr_state;
+        }
+    }
+
     /// <summary>
     /// 게임 인스턴스 클래스
     /// - 고정 틱 레이트(20 TPS)로 동작하는 게임 루프 관리
@@ -597,7 +670,7 @@ namespace BaseServer.Core.Game.Entities
             Console.WriteLine($"[Game] Move fleet command: Player {playerId}, " +
                 $"Fleet {fleetId} -> Planet {planetId}");
 
-            if(!m_dic_fleets.ContainsKey(fleetId))
+            if (!m_dic_fleets.ContainsKey(fleetId))
             {
                 Console.WriteLine($"[Game] Invalid TargetFleet!! : TargetFleet = {fleetId}");
                 return;
@@ -639,7 +712,7 @@ namespace BaseServer.Core.Game.Entities
                 return;
             }
             // 유효한 키 찾을때까지 반복
-            for(long id = 0; id < long.MaxValue; ++id)
+            for (long id = 0; id < long.MaxValue; ++id)
             {
                 // 이미 있으면 패스
                 if (m_dic_fleets.ContainsKey(id))
@@ -688,7 +761,7 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void MovementProcess(long currentTick)
         {
-            foreach(var fleet in m_dic_fleets)
+            foreach (var fleet in m_dic_fleets)
             {
                 fleet.Value.UpdateMovement(currentTick);
                 // 전투 범위 체크
@@ -745,13 +818,12 @@ namespace BaseServer.Core.Game.Entities
         /// <summary>
         /// 점령 처리
         /// - 함대가 적 행성을 점령하는 과정 처리
-        /// - FleetController에게 위임
         /// </summary>
         private void ConquerProcess(long currentTick)
         {
             if (m_gameMap == null)
                 return;
-            foreach(var planet in m_gameMap.Planets)
+            foreach (var planet in m_gameMap.Planets)
             {
             }
         }
@@ -777,10 +849,16 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void BroadcastEvent(long currentTick)
         {
-            // TODO: 게임 상태 브로드캐스트 로직 구현
-            // - 현재 게임 상태 직렬화
-            // - 모든 플레이어에게 전송
-            // - 필요한 경우 델타 업데이트만 전송 (최적화)
+            if (m_gameMap == null)
+            {
+                Console.WriteLine("[Game] m_gameMap == null");
+                return;
+            }
+            GameState state = new GameState(m_gameMap, m_players, m_dic_fleets, m_gameState);
+            foreach (var player in m_players)
+            {
+                player.Async_SendGameState(state,currentTick);
+            }
         }
         #endregion
 

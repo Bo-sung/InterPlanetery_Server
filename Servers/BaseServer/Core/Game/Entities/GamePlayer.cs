@@ -182,6 +182,18 @@ namespace BaseServer.Core.Game.Entities
             await clientSession.SendAsync(result.Serialize());
         }
 
+        public async Task Async_SendGameState(GameState state, long serverTick)
+        {
+            if (clientSession == null)
+                return;
+
+            Protocol result = new Protocol(ProtocolType.GAME_STATE);
+            result.AddObject<GameState>("gameState", state);
+            result.AddParam("serverTick", serverTick);
+
+            await clientSession.SendAsync(result.Serialize());
+        }
+
         #endregion
 
         #region 게임 로직

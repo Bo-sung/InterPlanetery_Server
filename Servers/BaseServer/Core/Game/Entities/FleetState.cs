@@ -2,7 +2,7 @@
 {
     public enum FleetState
     {
-        Idle,
+        Idle = 0,
         Moving,
         Attacking,
         Occupying,

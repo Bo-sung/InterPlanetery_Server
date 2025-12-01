@@ -36,6 +36,9 @@ namespace BaseServer.Core.Game.Entities
         public float MoveSpeed => _data.MoveSpeed;
         public float AttackPower => _data.AttackPower;
 
+        // 이동 타겟. 이동중이면 목적지. 공격중이면 공격 타겟 포지션. 없으면 현재 위치 전달
+        public Vector2 MoveTarget => State == FleetState.Moving ? _moveTo : State == FleetState.Attacking ?  _Enemy.Position : Position;
+
         public Fleet? Enemy => _Enemy;
 
         public Fleet(FleetInfoData data, int ownerId, long instanceId)
