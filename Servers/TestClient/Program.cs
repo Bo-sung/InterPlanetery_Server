@@ -92,7 +92,10 @@ namespace TestClient
             Console.WriteLine("2. Refresh Room List");
             Console.WriteLine("3. Create Room");
             Console.WriteLine("4. Join Room");
-            Console.WriteLine("5. Logout");
+            Console.WriteLine("5. Leave Room");
+            Console.WriteLine("6. Ready/Unready");
+            Console.WriteLine("7. Refresh Joined Room Info");
+            Console.WriteLine("8. Logout");
             Console.WriteLine("9. Disconnect");
             Console.WriteLine("0. Exit");
         }
@@ -157,6 +160,15 @@ namespace TestClient
                     await JoinRoom();
                     break;
                 case "5":
+                    await LeaveRoom();
+                    break;
+                case "6":
+                    await ToggleReady();
+                    break;
+                case "7":
+                    await RefreshJoinedRoomInfo();
+                    break;
+                case "8":
                     await Logout();
                     break;
                 case "9":
@@ -364,9 +376,9 @@ namespace TestClient
                 return;
             }
 
-            Console.Write("Enter slot (0 or 1): ");
+            Console.Write("Enter slot (0, 1, or -1 for auto): ");
             string? slotStr = Console.ReadLine();
-            int slot = 0;
+            int slot = -1; // 기본값을 -1(자동 할당)로 변경
             if (!string.IsNullOrEmpty(slotStr) && int.TryParse(slotStr, out int parsedSlot))
                 slot = parsedSlot;
 
@@ -376,6 +388,36 @@ namespace TestClient
                 .AddParam("roomId", roomId)
                 .AddParam("slot", slot);
 
+            await SendAsync(protocol.Serialize());
+        }
+
+        static async Task LeaveRoom()
+        {
+            if (stream == null) return;
+
+            Console.WriteLine("\n[Info] Leaving room...");
+
+            Protocol protocol = new Protocol(ProtoType.REQUEST_LEFT_ROOM);
+            await SendAsync(protocol.Serialize());
+        }
+
+        static async Task ToggleReady()
+        {
+            if (stream == null) return;
+
+            Console.WriteLine("\n[Info] Toggling ready status...");
+
+            Protocol protocol = new Protocol(ProtoType.REQUEST_READY);
+            await SendAsync(protocol.Serialize());
+        }
+
+        static async Task RefreshJoinedRoomInfo()
+        {
+            if (stream == null) return;
+
+            Console.WriteLine("\n[Info] Refreshing joined room info...");
+
+            Protocol protocol = new Protocol(ProtoType.REQUEST_REFRESH_JOINED_ROOM_INFO);
             await SendAsync(protocol.Serialize());
         }
 
@@ -512,6 +554,22 @@ namespace TestClient
                     HandleRoomClosed(protocol);
                     break;
 
+                case ProtoType.GAME_SET:
+                    HandleGameSet(protocol);
+                    break;
+
+                case ProtoType.GAME_STARTED:
+                    HandleGameStarted(protocol);
+                    break;
+
+                case ProtoType.GAME_STATE:
+                    HandleGameState(protocol);
+                    break;
+
+                case ProtoType.GAME_ENDED:
+                    HandleGameEnded(protocol);
+                    break;
+
                 default:
                     Console.WriteLine($"[Info] Unhandled protocol type: {protocol.Type}");
                     break;
@@ -619,6 +677,31 @@ namespace TestClient
                         Console.WriteLine($"  Players: {roomInfo.PlayerCount}/{roomInfo.MaxPlayers}");
                         Console.WriteLine($"  Chat Channel: {chatChannelId}");
                         break;
+
+                    case ProtoType.REQUEST_LEFT_ROOM:
+                        Console.WriteLine($"[Leave Room Success]");
+                        break;
+
+                    case ProtoType.REQUEST_READY:
+                        Console.WriteLine($"[Ready/Unready Success]");
+                        break;
+
+                    case ProtoType.REQUEST_REFRESH_JOINED_ROOM_INFO:
+                        var refreshedRoomInfo = protocol.GetStruct<RoomInfo>("roomInfo");
+                        var users = protocol.GetParam<WaittingRoomUser[]>("users");
+                        Console.WriteLine($"[Refresh Room Info Success]");
+                        Console.WriteLine($"  Room: {refreshedRoomInfo.RoomId} - {refreshedRoomInfo.RoomName}");
+                        Console.WriteLine($"  Players: {refreshedRoomInfo.PlayerCount}/{refreshedRoomInfo.MaxPlayers}");
+                        if (users != null && users.Length > 0)
+                        {
+                            Console.WriteLine("  Users in room:");
+                            foreach (var user in users)
+                            {
+                                string readyStatus = user.IsReady ? "[READY]" : "[NOT READY]";
+                                Console.WriteLine($"    - {user.userInfo.UserName} (ID: {user.userInfo.UserId}) {readyStatus}");
+                            }
+                        }
+                        break;
                 }
             }
             else
@@ -661,6 +744,36 @@ namespace TestClient
             string reason = protocol.GetParam<string>("reason");
 
             Console.WriteLine($"[Room Closed] Room: {roomId}, Reason: {reason}");
+        }
+
+        static void HandleGameSet(Protocol protocol)
+        {
+            Console.WriteLine($"[Game Set] Received game initialization data");
+
+            // 맵 정보는 복잡한 객체이므로 간단히 표시만
+            Console.WriteLine("  - Map info received");
+            Console.WriteLine("  - Planet layouts received");
+            Console.WriteLine("  - Planet info received");
+            Console.WriteLine("  - Routes received");
+            Console.WriteLine("  Game map is ready!");
+        }
+
+        static void HandleGameStarted(Protocol protocol)
+        {
+            Console.WriteLine($"[Game Started] The game has started!");
+        }
+
+        static void HandleGameState(Protocol protocol)
+        {
+            long serverTick = protocol.GetParam<long>("serverTick");
+
+            // GameState는 복잡한 객체이므로 틱 정보만 표시
+            Console.WriteLine($"[Game State Update] Server Tick: {serverTick}");
+        }
+
+        static void HandleGameEnded(Protocol protocol)
+        {
+            Console.WriteLine($"[Game Ended] The game has ended!");
         }
     }
 }
