@@ -3,6 +3,7 @@ using CommonLib;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
+using System.Linq;
 
 namespace ChatClientWPF.ViewModels
 {
@@ -11,6 +12,7 @@ namespace ChatClientWPF.ViewModels
         private readonly MainViewModel _mainViewModel;
         private RoomInfo _currentRoom;
         private ObservableCollection<ChatMessage> _chatMessages;
+        private ObservableCollection<WaittingRoomUser> _roomUsers;
         private string _chatInput = "";
         private bool _isReady;
 
@@ -24,6 +26,12 @@ namespace ChatClientWPF.ViewModels
         {
             get => _chatMessages;
             set => SetProperty(ref _chatMessages, value);
+        }
+
+        public ObservableCollection<WaittingRoomUser> RoomUsers
+        {
+            get => _roomUsers;
+            set => SetProperty(ref _roomUsers, value);
         }
 
         public string ChatInput
@@ -41,26 +49,29 @@ namespace ChatClientWPF.ViewModels
         public ICommand LeaveRoomCommand { get; }
         public ICommand SendChatCommand { get; }
         public ICommand ReadyCommand { get; }
+        public ICommand RefreshRoomInfoCommand { get; }
 
         public RoomViewModel(MainViewModel mainViewModel)
         {
             _mainViewModel = mainViewModel;
             _chatMessages = new ObservableCollection<ChatMessage>();
-            
-            // Initialize with current room info if available (it should be)
-            // We might need to store CurrentRoomInfo in MainViewModel or ChatModel if we want to access it synchronously here
-            // But usually we get OnRoomJoined event before navigating here.
-            // Let's assume we can get it or wait for update.
-            
+            _roomUsers = new ObservableCollection<WaittingRoomUser>();
+
             LeaveRoomCommand = new RelayCommand(ExecuteLeaveRoom);
             SendChatCommand = new RelayCommand(ExecuteSendChat);
             ReadyCommand = new RelayCommand(ExecuteReady);
+            RefreshRoomInfoCommand = new RelayCommand(ExecuteRefreshRoomInfo);
 
             _mainViewModel.ChatModel.OnRoomInfoChanged += OnRoomInfoChanged;
             _mainViewModel.ChatModel.OnChatMessageReceived += OnChatMessageReceived;
             _mainViewModel.ChatModel.OnRoomClosed += OnRoomClosed;
             _mainViewModel.ChatModel.OnUserJoinedRoom += OnUserJoinedRoom;
             _mainViewModel.ChatModel.OnUserLeftRoom += OnUserLeftRoom;
+            _mainViewModel.ChatModel.OnRoomInfoRefreshed += OnRoomInfoRefreshed;
+            _mainViewModel.ChatModel.OnRoomJoined += OnRoomJoined;
+
+            // 방 정보 자동 새로고침
+            _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
         }
 
         private void ExecuteLeaveRoom(object? obj)
@@ -78,8 +89,22 @@ namespace ChatClientWPF.ViewModels
 
         private void ExecuteReady(object? obj)
         {
-            IsReady = !IsReady;
-            // TODO: Send Ready Protocol
+            _mainViewModel.ChatModel.ToggleReadyAsync();
+        }
+
+        private void ExecuteRefreshRoomInfo(object? obj)
+        {
+            _mainViewModel.ChatModel.RefreshRoomInfoAsync();
+        }
+
+        private void OnRoomJoined(RoomInfo roomInfo, int chatChannelId)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                CurrentRoom = roomInfo;
+                // 방 입장 후 정보 새로고침
+                _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
+            });
         }
 
         private void OnRoomInfoChanged(RoomInfo roomInfo)
@@ -87,6 +112,26 @@ namespace ChatClientWPF.ViewModels
             Application.Current.Dispatcher.Invoke(() =>
             {
                 CurrentRoom = roomInfo;
+            });
+        }
+
+        private void OnRoomInfoRefreshed(RoomInfo roomInfo, WaittingRoomUser[] users)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                CurrentRoom = roomInfo;
+                RoomUsers.Clear();
+                foreach (var user in users)
+                {
+                    RoomUsers.Add(user);
+                }
+
+                // 내 Ready 상태 업데이트
+                var myUser = users.FirstOrDefault(u => u.userInfo.UserName == _mainViewModel.ChatModel.UserName);
+                if (myUser.userInfo.UserName != null)
+                {
+                    IsReady = myUser.IsReady;
+                }
             });
         }
 
@@ -112,6 +157,8 @@ namespace ChatClientWPF.ViewModels
              Application.Current.Dispatcher.Invoke(() =>
             {
                 ChatMessages.Add(new ChatMessage { SenderId = "SYSTEM", Message = $"{userName} 님이 입장하셨습니다." });
+                // 방 정보 새로고침
+                _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
             });
         }
 
@@ -120,6 +167,8 @@ namespace ChatClientWPF.ViewModels
              Application.Current.Dispatcher.Invoke(() =>
             {
                 ChatMessages.Add(new ChatMessage { SenderId = "SYSTEM", Message = $"플레이어 {userId} 님이 퇴장하셨습니다." });
+                // 방 정보 새로고침
+                _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
             });
         }
     }

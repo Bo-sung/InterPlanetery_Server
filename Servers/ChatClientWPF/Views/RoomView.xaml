@@ -1,9 +1,9 @@
 <UserControl x:Class="ChatClientWPF.Views.RoomView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             mc:Ignorable="d" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
     <Grid Background="{StaticResource BackgroundBrush}" Margin="20">
         <Grid.ColumnDefinitions>
@@ -22,9 +22,10 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Button Content="← 로비로 나가기" Command="{Binding LeaveRoomCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="15,5"/>
-                
+
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="{Binding CurrentRoom.RoomName}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,20,0"/>
                     <Border Background="{StaticResource SuccessBrush}" CornerRadius="4" Padding="8,4" VerticalAlignment="Center">
@@ -32,9 +33,11 @@
                     </Border>
                 </StackPanel>
 
-                <Button Grid.Column="2" Content="{Binding IsReady, Converter={StaticResource BoolToReadyTextConverter}}" 
-                        Command="{Binding ReadyCommand}" 
-                        Style="{Binding IsReady, Converter={StaticResource BoolToReadyButtonStyleConverter}}" 
+                <Button Grid.Column="2" Content="새로고침" Command="{Binding RefreshRoomInfoCommand}" Style="{StaticResource SecondaryButtonStyle}" Padding="15,5" Margin="0,0,10,0"/>
+
+                <Button Grid.Column="3" Content="{Binding IsReady, Converter={StaticResource BoolToReadyTextConverter}}"
+                        Command="{Binding ReadyCommand}"
+                        Style="{Binding IsReady, Converter={StaticResource BoolToReadyButtonStyleConverter}}"
                         Padding="20,8"/>
             </Grid>
         </Border>
@@ -43,30 +46,88 @@
         <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,20,0">
             <Border Style="{StaticResource SectionBorderStyle}" Margin="0,0,0,15">
                 <StackPanel>
-                    <TextBlock Text="{Binding CurrentRoom.PlayerCount, StringFormat='플레이어 ({0}/{1})'}" Style="{StaticResource SectionHeaderStyle}"/>
-                    <!-- Placeholder for player slots visualization -->
-                    <Border Background="{StaticResource BackgroundBrush}" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="2" CornerRadius="4" Padding="20" Margin="0,0,0,15">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Width="60" Height="60" CornerRadius="30" Background="{StaticResource PrimaryBrush}" Margin="0,0,15,0">
-                                <TextBlock Text="P1" Foreground="White" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="플레이어 1" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                <TextBlock Text="방장" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"/>
-                            </StackPanel>
-                            <Border Grid.Column="2" Background="{StaticResource WarningBrush}" CornerRadius="4" Padding="10,5">
-                                <TextBlock Text="준비 안됨" Foreground="White" FontWeight="Bold"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-                    
-                     <Border Background="{StaticResource BackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="2" CornerRadius="4" Padding="20" Opacity="0.5" IsEnabled="False">
-                         <!-- Empty Slot -->
+                    <TextBlock Text="{Binding CurrentRoom.PlayerCount, StringFormat='플레이어 ({0}/2)'}" Style="{StaticResource SectionHeaderStyle}"/>
+
+                    <!-- Dynamic Player List -->
+                    <ItemsControl ItemsSource="{Binding RoomUsers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource BackgroundBrush}"
+                                        BorderBrush="{StaticResource PrimaryBrush}"
+                                        BorderThickness="2"
+                                        CornerRadius="4"
+                                        Padding="20"
+                                        Margin="0,0,0,15">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="60" Height="60" CornerRadius="30" Background="{StaticResource PrimaryBrush}" Margin="0,0,15,0">
+                                            <TextBlock Text="{Binding userInfo.UserName, Converter={StaticResource StringToInitialsConverter}}"
+                                                       Foreground="White" FontSize="24" FontWeight="Bold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding userInfo.UserName}" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding userInfo.UserId, StringFormat='ID: {0}'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="2" CornerRadius="4" Padding="10,5">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsReady}" Value="True">
+                                                            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsReady}" Value="False">
+                                                            <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Foreground="White" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsReady}" Value="True">
+                                                                <Setter Property="Text" Value="준비 완료"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsReady}" Value="False">
+                                                                <Setter Property="Text" Value="준비 안됨"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Empty Slots -->
+                    <Border Background="{StaticResource BackgroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="2"
+                            CornerRadius="4"
+                            Padding="20"
+                            Opacity="0.5"
+                            IsEnabled="False">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RoomUsers.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding RoomUsers.Count}" Value="1">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -82,18 +143,23 @@
                     </Border>
                 </StackPanel>
             </Border>
-            
+
             <Border Style="{StaticResource SectionBorderStyle}">
                 <StackPanel>
                     <TextBlock Text="게임 설정" Style="{StaticResource SectionHeaderStyle}"/>
                      <Grid Margin="0,5">
                         <TextBlock Text="맵" Style="{StaticResource TextSecondaryStyle}"/>
-                        <TextBlock Text="3레인 전투장" Style="{StaticResource TextPrimaryStyle}" HorizontalAlignment="Right" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding CurrentRoom.MapID, StringFormat='맵 #{0}'}" Style="{StaticResource TextPrimaryStyle}" HorizontalAlignment="Right" FontWeight="Bold"/>
                     </Grid>
                     <Separator Background="{StaticResource BorderBrush}" Margin="0,5"/>
                      <Grid Margin="0,5">
                         <TextBlock Text="최대 인원" Style="{StaticResource TextSecondaryStyle}"/>
                         <TextBlock Text="2명" Style="{StaticResource TextPrimaryStyle}" HorizontalAlignment="Right" FontWeight="Bold"/>
+                    </Grid>
+                    <Separator Background="{StaticResource BorderBrush}" Margin="0,5"/>
+                     <Grid Margin="0,5">
+                        <TextBlock Text="상태" Style="{StaticResource TextSecondaryStyle}"/>
+                        <TextBlock Text="{Binding CurrentRoom.RoomState}" Style="{StaticResource TextPrimaryStyle}" HorizontalAlignment="Right" FontWeight="Bold"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -108,7 +174,7 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <TextBlock Text="채팅" Style="{StaticResource SectionHeaderStyle}"/>
-                
+
                 <ListBox Grid.Row="1" ItemsSource="{Binding ChatMessages}" Style="{StaticResource ListBoxStyle}" Margin="0,0,0,15">
                     <ListBox.ItemTemplate>
                         <DataTemplate>

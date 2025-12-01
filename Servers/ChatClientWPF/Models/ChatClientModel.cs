@@ -38,6 +38,7 @@ namespace ChatClientWPF.Models
         public event Action<int, int>? OnUserLeftRoom; // userId, playerCount
         public event Action<RoomInfo>? OnRoomInfoChanged;
         public event Action<string, string>? OnRoomClosed; // roomId, reason
+        public event Action<RoomInfo, WaittingRoomUser[]>? OnRoomInfoRefreshed; // roomInfo, users
 
         // Chat Events
         public event Action<ChatMessage>? OnChatMessageReceived;
@@ -160,6 +161,18 @@ namespace ChatClientWPF.Models
             var protocol = new Protocol(ProtoType.REQUEST_LEFT_ROOM);
             await SendAsync(protocol);
             _currentRoomId = null;
+        }
+
+        public async Task ToggleReadyAsync()
+        {
+            var protocol = new Protocol(ProtoType.REQUEST_READY);
+            await SendAsync(protocol);
+        }
+
+        public async Task RefreshRoomInfoAsync()
+        {
+            var protocol = new Protocol(ProtoType.REQUEST_REFRESH_JOINED_ROOM_INFO);
+            await SendAsync(protocol);
         }
 
         public async Task SendChatMessageAsync(string message, int type, int channelId)
@@ -353,6 +366,13 @@ namespace ChatClientWPF.Models
                     break;
                 case ProtoType.REQUEST_LEFT_ROOM:
                     _currentRoomId = null;
+                    break;
+                case ProtoType.REQUEST_REFRESH_JOINED_ROOM_INFO:
+                    {
+                        var roomInfo = protocol.GetStruct<RoomInfo>("roomInfo");
+                        var users = protocol.GetParam<WaittingRoomUser[]>("users");
+                        OnRoomInfoRefreshed?.Invoke(roomInfo, users ?? new WaittingRoomUser[0]);
+                    }
                     break;
             }
         }
