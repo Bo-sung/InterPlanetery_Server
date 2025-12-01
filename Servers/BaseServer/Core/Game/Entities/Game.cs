@@ -23,6 +23,9 @@ namespace BaseServer.Core.Game.Entities
         {
             public int id = -1;
             public FleetInfo[] fleets;
+            public int Gas;
+            public int Mineral;
+            public int Supply;
         }
 
         public class FleetInfo
@@ -76,6 +79,9 @@ namespace BaseServer.Core.Game.Entities
                     fleetList.Add(fleet);
                 }
                 p.fleets = fleetList.ToArray();
+                p.Gas = item.Gas;
+                p.Mineral = item.Mineral;
+                p.Supply = item.Supply;
                 playerList.Add(p);
             }
             players = playerList.ToArray();
@@ -357,6 +363,9 @@ namespace BaseServer.Core.Game.Entities
             m_gameMap = new GameMap(staticMapData);
             m_produceController.OnProductionFinish += HandleOnProductionFinish;
 
+            // 모든 유저 준비 전까지 대기
+            await WaitUntilUsersReadyAll();
+
             // 게임 상태 초기화
             m_gameState = GAMESTATE_RUNNING;                              // 게임 실행 상태로 변경
             m_startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); // 시작 시간 기록
@@ -364,6 +373,7 @@ namespace BaseServer.Core.Game.Entities
             m_processedTicks.Clear();                                     // 처리된 틱 히스토리 초기화
             m_gameLoopCts = new CancellationTokenSource();                // 게임 루프 취소 토큰 생성
 
+            await BroadcastGameStart();
             Console.WriteLine($"[Game] Game started with map {mapIndex}");
 
             // 게임 루프를 별도 Task로 시작 (비동기 실행)
@@ -459,6 +469,47 @@ namespace BaseServer.Core.Game.Entities
         {
             long elapsedTimeMs = GetElapsedTime();
             return elapsedTimeMs / (long)(FIXED_TICK_RATE * 1000);
+        }
+
+        private async Task WaitUntilUsersReadyAll()
+        {
+            int readyRequireCount = m_players.Length;
+            var tcs = new TaskCompletionSource<bool>();
+
+            Action handler = null;
+            handler = () =>
+            {
+                readyRequireCount--;
+                if (readyRequireCount <= 0)
+                {
+                    // 모든 플레이어 준비 완료
+                    tcs.TrySetResult(true);
+
+                    // 이벤트 구독 해제
+                    foreach (var player in m_players)
+                    {
+                        player.OnUserReady -= handler;
+                    }
+                }
+            };
+
+            // 이벤트 구독
+            foreach (var player in m_players)
+            {
+                player.OnUserReady += handler;
+            }
+
+            await tcs.Task;
+        }
+
+        private async Task BroadcastGameStart()
+        {
+            foreach(var player in m_players)
+            {
+                player.Async_SendGameStart();
+            }
+
+            await Task.Delay(10);   // 10ms 딜레이
         }
 
         /// <summary>

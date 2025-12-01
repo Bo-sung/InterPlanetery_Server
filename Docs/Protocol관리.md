@@ -2,7 +2,7 @@
 
 ## 기본 정보
 - 통신 방식: TCP/UDP
-- 인코딩: JSON
+- 인코딩: Binary Header (18 bytes) + JSON Body
 - 버전: 1.0.0
 
 ## 프로토콜 목록
@@ -16,6 +16,8 @@
 | 10002 | CHAT_MESSAGE | 메시지 전송 |
 | 10003 | HEARTBEAT | 하트비트 (연결 유지 확인) |
 | 10004 | REQUEST_TABLEDATA | 테이블 데이터 요청 |
+| 10005 | REQUEST_REGISTER | 회원가입 요청 |
+| 10006 | REQUEST_REGISTER_AUTO | 자동 회원가입 요청 (게스트) |
 | 10010 | REQUEST_JOIN_LOBBY | 로비 접속 요청 |
 | 10011 | REFRESH_LOBBY | 로비 새로고침 요청 |
 | 10012 | REQUEST_CREATE_ROOM | 방 생성 요청 |
@@ -35,7 +37,7 @@
 | 20011 | USER_LEFT | 유저 이탈 알림 |
 | 20012 | ROOM_INFO_CHANGED | 방 정보 변경 알림 |
 | 20013 | ROOM_CLOSED | 방 삭제 알림 |
-| 3010 | SUBMIT_COMMAND | 명령 제출 |
+| 30100 | SUBMIT_COMMAND | 명령 제출 |
 
 ## 프로토콜 상세
 
@@ -77,6 +79,22 @@
   - tableTypes: type[]
   - tableData: object[][];
 
+### REQUEST_REGISTER
+- ID: 10005
+- 파라미터:
+  - username: string
+  - password: string
+- 응답 param:
+  - message: string
+
+### REQUEST_REGISTER_AUTO
+- ID: 10006
+- 파라미터: 없음
+- 응답 param:
+  - username: string
+  - password: string
+  - message: string
+
 ### REQUEST_JOIN_LOBBY
 - ID: 10010
 - 파라미터:
@@ -89,96 +107,6 @@
 ### REFRESH_LOBBY
 - ID: 10011
 - 파라미터: 없음
-- 응답 param:
-  - roomList: RoomInfo[]
-
-### REQUEST_CREATE_ROOM
-- ID: 10012
-- 파라미터:
-  - room_name: string
-  - mapId: int
-  - is_private: boolean
-- 응답 param:
-  - roomId: string
-  - slot: int
-
-### REQUEST_JOIN_ROOM
-- ID: 10013
-- 파라미터:
-  - roomId: string
-  - slot: int
-- 응답 param:
-  - roomInfo: RoomInfo
-  - chatChannelID: string
-
-### REQUEST_READY
-- ID: 10014
-- 파라미터:
-  - isReady: boolean
-- 응답 param:
-
-### REQUEST_LEFT_ROOM
-- ID: 10015
-- 파라미터:
-- 응답 param: 
-
-### RESPONSE    
-- ID: 20000
-- 설명 : 응답 공통 프로토콜
-- 파라미터:
-  - protoId: int
-  - status: int
-  - message: string
-  - data: object
-
-### BRODCAST_SYSTEM
-- ID: 20001
-- 파라미터:
-  - message: string
-  - type: int
-
-### BRODCAST_CHAT_MESSAGE
-- ID: 20002
-- 파라미터:
-  - chatMessage: ChatMessage
-
-### HEARTBEAT_ACK
-- ID: 20003
-- 파라미터:
-  - timestamp: long
-  - server_time: long
-
-### USER_JOINED
-- ID: 20010
-- 파라미터:
-  - userinfo: UserInfo
-
-### USER_LEFT
-- ID: 20011
-- 파라미터:
-  - userind: string
-  - reason: int
-
-### ROOM_INFO_CHANGED
-- ID: 20012
-- 파라미터:
-  - roomId: string
-  - roomInfo: RoomInfo
-
-### ROOM_CLOSED
-- ID: 20013
-- 파라미터:
-  - roomId: string
-  - reason: int
-
-### SUBMIT_COMMAND
-- ID: 3010
-- 파라미터:
-  - command_type: int
-  - command_data: object
-
-## 구조체 정의
-
 ### UserData
 - userId: int
 - username: string

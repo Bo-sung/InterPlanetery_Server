@@ -152,14 +152,37 @@ namespace BaseServer.Core.Game.Entities
                 if (mapId >= 0)
                     MapID = mapId;
 
+                var value = GetRoomInfo();
+
+
                 Protocol proto = new Protocol(ProtocolType.ROOM_INFO_CHANGED)
-                    .AddParam("roomId", RoomId)
-                    .AddStruct("roomInfo", RoomInfo);
+                    .AddParam("roomId", value.roomId)
+                    .AddStruct("roomInfo", value.roomInfo)
+                    .AddObject<WaittingRoomUser[]>("users", value.waitusers);
 
                 Broadcast(proto);
             }
 
             Console.WriteLine($"[Room {RoomId}] Info updated - Name: {Name}, MapID: {MapID}");
+        }
+
+        public (string roomId, RoomInfo roomInfo, WaittingRoomUser[] waitusers) GetRoomInfo()
+        {
+            WaittingRoomUser[] tempUsers = new WaittingRoomUser[m_users.Length];
+
+            for (int index = 0; index < tempUsers.Length; index++)
+            {
+                var temp = new WaittingRoomUser();
+                temp.userInfo = new UserInfo()
+                {
+                    UserId = m_users[index].ID,
+                    UserName = m_users[index].Name
+                };
+                tempUsers[index] = temp;
+            }
+
+            return (roomid: RoomId, roomInfo: RoomInfo, waitusers: tempUsers);
+
         }
 
         public async Task NotifyRoomClosed()
@@ -217,6 +240,24 @@ namespace BaseServer.Core.Game.Entities
         #endregion
 
         #region 플레이어 관리 메소드
+        /// <summary>
+        /// 빈 슬롯을 찾아서 반환. 빈 슬롯이 없으면 -1 반환
+        /// </summary>
+        public int FindEmptySlot()
+        {
+            lock (m_lockObj)
+            {
+                for (int i = 0; i < m_users.Length; i++)
+                {
+                    if (m_users[i] == null || !m_users[i].IsValid)
+                    {
+                        return i;
+                    }
+                }
+                return -1; // 빈 슬롯 없음
+            }
+        }
+
         public bool TryAddPlayer(ClientSession session, int slot)
         {
             if (session == null)

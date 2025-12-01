@@ -15,9 +15,9 @@ using ProtocolType = CommonLib.ProtocolType;
 namespace BaseServer.Core.Game.Entities
 {
     /// <summary>
-    ﻿    /// 게임 플레이어 객체. 클라이언트 세션을 래핑하여 사용.
-    ﻿    /// 대충 GamePlayer 라는 메카에 ClientSession이 탑승한 상태라 보면 됨.
-    ﻿    /// </summary>
+    /// 게임 플레이어 객체. 클라이언트 세션을 래핑하여 사용.
+    /// 대충 GamePlayer 라는 메카에 ClientSession이 탑승한 상태라 보면 됨.
+    /// </summary>
     public class GamePlayer
     {
         #region 상수
@@ -125,10 +125,9 @@ namespace BaseServer.Core.Game.Entities
         }
 
         /// <summary>
-        ﻿/// 카멘드 처리
-        ﻿/// </summary>
-        ﻿/// <param name="_protocol"></param>
-        ﻿/// <returns></returns>
+        /// 카멘드 처리
+        /// </summary>
+        /// <param name="_protocol"></param>
         private async Task HandleSubmitCommand(Protocol _protocol)
         {
             var commandTypeVal = _protocol.GetParam<int>("commandType");
@@ -175,9 +174,9 @@ namespace BaseServer.Core.Game.Entities
 
             Protocol result = new Protocol(ProtocolType.GAME_SET);
             result.AddObject("mapinfo", map.mapInfoData);
-            result.AddObject("mapplanetinfo", map.mapInfoData);
-            result.AddObject("planets", map.mapInfoData);
-            result.AddObject("routes", map.mapInfoData);
+            result.AddObject("mapplanetinfo", map.PlanetLayouts.ToArray());
+            result.AddObject("planets", map.PlanetInfos.ToArray());
+            result.AddObject("routes", map.Connections.ToArray());
 
             await clientSession.SendAsync(result.Serialize());
         }
@@ -190,6 +189,16 @@ namespace BaseServer.Core.Game.Entities
             Protocol result = new Protocol(ProtocolType.GAME_STATE);
             result.AddObject<GameState>("gameState", state);
             result.AddParam("serverTick", serverTick);
+
+            await clientSession.SendAsync(result.Serialize());
+        }
+
+        public async Task Async_SendGameStart()
+        {
+            if (clientSession == null)
+                return;
+
+            Protocol result = new Protocol(ProtocolType.GAME_STARTED);
 
             await clientSession.SendAsync(result.Serialize());
         }

@@ -200,16 +200,17 @@ namespace BaseServer.Core.Game.Entities
                 return;
             }
 
-            if (!m_session.CurrentRoom.TryRemovePlayer(m_session))
-            {
-                var error = new Response(protocol.Type, StateCode.FAIL, "룸 퇴장 실패");
-
-                await m_session.SendAsync(error.Serialize());
-                return;
-            }
-
+            // 먼저 성공 응답을 보낸 후 방에서 제거
+            // (TryRemovePlayer 내부에서 Cleanup()이 호출되어 m_session이 null이 됨)
             var response = new Response(protocol.Type, StateCode.SUCCESS);
             await m_session.SendAsync(response.Serialize());
+
+            // 응답 전송 후 방에서 제거
+            if (!m_session.CurrentRoom.TryRemovePlayer(m_session))
+            {
+                Console.WriteLine($"[GameRoomUser] 방 퇴장 처리 중 오류 발생 (User: {m_id})");
+            }
+
             return;
         }
         #endregion

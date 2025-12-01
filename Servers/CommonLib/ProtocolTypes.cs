@@ -5,7 +5,6 @@
     /// </summary>
     public static class ProtocolType
     {
-
         // 클라이언트 -> 서버 (서버 공통 타입과 정확히 일치)
         public const int REQUEST_LOGIN = 10000;                 // 로그인 요청
         public const int REQUEST_LOGOUT = 10001;                //로그아웃 요청
@@ -19,13 +18,14 @@
         public const int CHAT_CHANNEL_REFRESH = 10101;
         public const int CHAT_CHANNEL_LEFT = 10102;
 
-        public const int REQUEST_JOIN_LOBBY = 10010;            //로비 접속 요청
+        public const int REQUEST_JOIN_LOBBY = 10010;                //로비 접속 요청
 
-        public const int REFRESH_LOBBY = 10011;                 //로비 새로고침 요청
-        public const int REQUEST_CREATE_ROOM = 10012;           //방 생성 요청
-        public const int REQUEST_JOIN_ROOM = 10013;             //방 입장 요청
-        public const int REQUEST_READY = 10014;                 // 게임 레디
-        public const int REQUEST_LEFT_ROOM = 10015;             // 방 퇴장 요청
+        public const int REFRESH_LOBBY = 10011;                     //로비 새로고침 요청
+        public const int REQUEST_CREATE_ROOM = 10012;               //방 생성 요청
+        public const int REQUEST_JOIN_ROOM = 10013;                 //방 입장 요청
+        public const int REQUEST_READY = 10014;                     // 게임 레디
+        public const int REQUEST_LEFT_ROOM = 10015;                 // 방 퇴장 요청
+        public const int REQUEST_REFRESH_JOINED_ROOM_INFO = 10016;  // 입장한 방 정보 갱신 요청
 
         public const int REQUEST_GAME_CL_READY = 10200;
 
@@ -88,5 +88,11 @@
     {
         public int UserId { get; set; }
         public string UserName { get; set; }
+    }
+
+    public struct WaittingRoomUser
+    {
+        public UserInfo userInfo { get; set; }
+        public bool IsReady { get; set; }
     }
 }

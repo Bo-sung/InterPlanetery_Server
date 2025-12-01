@@ -604,16 +604,6 @@ namespace BaseServer.Core.Game.Session
 
             LogWithTimestamp($"[Session {SessionId}] Room Parameters - RoomID: {roomId}, Slot: {slot}");
 
-            // 슬롯 범위 검증
-            if (slot >= GameRoom.MaxPlayers || slot < 0)
-            {
-                LogWithTimestamp($"[Session {SessionId}] Join Room Failed - Invalid slot: {slot}");
-                var error = new Response(protocol.Type, StateCode.FAIL);
-                error.AddParam("message", "Invalid slot number");
-                await SendAsync(error.Serialize());
-                return;
-            }
-
             // 룸 존재 확인
             var room = RoomManager.Instance.GetRoom(roomId);
             if (room == null)
@@ -621,6 +611,30 @@ namespace BaseServer.Core.Game.Session
                 LogWithTimestamp($"[Session {SessionId}] Join Room Failed - Room not found: {roomId}");
                 var error = new Response(protocol.Type, StateCode.NO_RESOURCE);
                 error.AddParam("message", "Room not found");
+                await SendAsync(error.Serialize());
+                return;
+            }
+
+            // 슬롯 -1이면 자동으로 빈 슬롯 찾기
+            if (slot == -1)
+            {
+                slot = room.FindEmptySlot();
+                if (slot == -1)
+                {
+                    LogWithTimestamp($"[Session {SessionId}] Join Room Failed - No empty slot available");
+                    var error = new Response(protocol.Type, StateCode.FAIL);
+                    error.AddParam("message", "Room is full");
+                    await SendAsync(error.Serialize());
+                    return;
+                }
+                LogWithTimestamp($"[Session {SessionId}] Auto-assigned to slot: {slot}");
+            }
+            // 슬롯 범위 검증 (자동 할당이 아닌 경우)
+            else if (slot >= GameRoom.MaxPlayers || slot < 0)
+            {
+                LogWithTimestamp($"[Session {SessionId}] Join Room Failed - Invalid slot: {slot}");
+                var error = new Response(protocol.Type, StateCode.FAIL);
+                error.AddParam("message", "Invalid slot number");
                 await SendAsync(error.Serialize());
                 return;
             }
@@ -637,10 +651,13 @@ namespace BaseServer.Core.Game.Session
 
             LogWithTimestamp($"[Session {SessionId}] Join Room Success - RoomID: {roomId}, Slot: {slot}");
 
+            var temp = room.GetRoomInfo();
             // 성공 응답
             var response = new Response(protocol.Type, StateCode.SUCCESS);
-            response.AddStruct("roominfo", room.RoomInfo);
             response.AddParam("chatChannelId", room.ChatChID);
+            response.AddParam("roomId", temp.roomId);
+            response.AddStruct<RoomInfo>("roomInfo", temp.roomInfo);
+            response.AddParam("users", temp.waitusers);
             await SendAsync(response.Serialize());
         }
 
