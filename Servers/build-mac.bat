@@ -26,6 +26,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo Build failed!
     goto END
 )
+echo Copying appsettings.example.json...
+copy appsettings.example.json .\publish\osx-x64\appsettings.example.json
 echo.
 echo Build completed: ./publish/osx-x64/
 goto END
@@ -37,6 +39,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo Build failed!
     goto END
 )
+echo Copying appsettings.example.json...
+copy appsettings.example.json .\publish\osx-arm64\appsettings.example.json
 echo.
 echo Build completed: ./publish/osx-arm64/
 goto END
@@ -48,6 +52,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo Build failed!
     goto END
 )
+echo Copying appsettings.example.json to osx-x64...
+copy appsettings.example.json .\publish\osx-x64\appsettings.example.json
 echo.
 
 echo [2/2] Building for Mac Apple Silicon (osx-arm64)...
@@ -56,6 +62,8 @@ if %ERRORLEVEL% NEQ 0 (
     echo Build failed!
     goto END
 )
+echo Copying appsettings.example.json to osx-arm64...
+copy appsettings.example.json .\publish\osx-arm64\appsettings.example.json
 echo.
 echo ========================================
 echo   Build Completed Successfully!
@@ -65,10 +73,11 @@ echo Intel Mac build: ./publish/osx-x64/
 echo Apple Silicon build: ./publish/osx-arm64/
 echo.
 echo Next steps:
-echo 1. Copy appsettings.json to the publish folder
-echo 2. Transfer files to Mac server
-echo 3. Run: chmod +x BaseServer
-echo 4. Run: ./BaseServer
+echo 1. Transfer files to Mac server (appsettings.json will be excluded)
+echo 2. On Mac, copy appsettings.example.json to appsettings.json
+echo 3. Edit appsettings.json with your configuration
+echo 4. Run: chmod +x BaseServer
+echo 5. Run: ./BaseServer
 goto END
 
 :END

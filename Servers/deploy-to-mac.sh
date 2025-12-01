@@ -48,9 +48,9 @@ echo ""
 echo "[1/4] Creating target directory on Mac server..."
 ssh $MAC_USER@$MAC_IP "mkdir -p $TARGET_PATH"
 
-# 파일 전송
-echo "[2/4] Transferring files..."
-scp -r $BUILD_DIR/* $MAC_USER@$MAC_IP:$TARGET_PATH/
+# 파일 전송 (appsettings.json 제외)
+echo "[2/4] Transferring files (excluding appsettings.json)..."
+rsync -av --progress --exclude 'appsettings.json' $BUILD_DIR/ $MAC_USER@$MAC_IP:$TARGET_PATH/
 
 # 실행 권한 부여
 echo "[3/4] Setting execute permission..."
