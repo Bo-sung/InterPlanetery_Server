@@ -64,7 +64,7 @@ namespace BaseServer.Core.Game.Session
         // 타임스탬프 로그 헬퍼 메서드
         private void LogWithTimestamp(string message)
         {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
             var elapsed = m_sessionTimer?.ElapsedMilliseconds ?? 0;
             Console.WriteLine($"[{timestamp}] [{elapsed,6}ms] {message}");
         }

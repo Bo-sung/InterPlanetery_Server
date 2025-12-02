@@ -125,6 +125,7 @@ namespace BaseServer.Core.Game.Entities
                 bool allPlayersReady = m_users.All(user =>
                     user != null && user.IsValid && user.IsReady);
 
+                Console.WriteLine($"[Room {RoomId}] players ready changed.IsAllReady = {allPlayersReady}");
                 if (!allPlayersReady)
                     return;
 
