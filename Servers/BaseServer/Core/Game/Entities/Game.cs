@@ -1,4 +1,4 @@
-﻿using BaseServer.Core.Game.Managers;
+using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
 using BaseServer.Database;
 using CommonLib.Commands;
@@ -188,7 +188,18 @@ namespace BaseServer.Core.Game.Entities
                 m_players[i] = new GamePlayer();
             }
 
-            Console.WriteLine("[Game] Game instance created");
+            LogWithTimestamp("[Game] Game instance created");
+        }
+        #endregion
+
+        #region 로깅
+        /// <summary>
+        /// 타임스탬프가 포함된 로그 출력
+        /// </summary>
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            Console.WriteLine($"[{timestamp}] {message}");
         }
         #endregion
 
@@ -204,14 +215,14 @@ namespace BaseServer.Core.Game.Entities
             // null 체크
             if (command == null)
             {
-                Console.WriteLine("[Game] Cannot enqueue null command");
+                LogWithTimestamp("[Game] Cannot enqueue null command");
                 return;
             }
 
             // 게임이 실행 중인지 확인
             if (m_gameState != GAMESTATE_RUNNING)
             {
-                Console.WriteLine($"[Game] Cannot enqueue command - game not running (state: {m_gameState})");
+                LogWithTimestamp($"[Game] Cannot enqueue command - game not running (state: {m_gameState})");
                 return;
             }
 
@@ -251,7 +262,7 @@ namespace BaseServer.Core.Game.Entities
                 // 명령 추가
                 m_commandQueue[targetTick].Add(command);
 
-                Console.WriteLine($"[Game] Command queued for tick {targetTick} " +
+                LogWithTimestamp($"[Game] Command queued for tick {targetTick} " +
                     $"(Type: {command.Type}, Player: {command.PlayerId}, Current: {currentTick})");
             }
             finally
@@ -276,7 +287,7 @@ namespace BaseServer.Core.Game.Entities
             // null 체크
             if (session == null || commandSender == null)
             {
-                Console.WriteLine("[Game] Cannot join - null session or command sender");
+                LogWithTimestamp("[Game] Cannot join - null session or command sender");
                 return false;
             }
 
@@ -288,13 +299,13 @@ namespace BaseServer.Core.Game.Entities
                 {
                     // 플레이어 초기화 및 세션 연결
                     m_players[i].Initilaize(session, commandSender);
-                    Console.WriteLine($"[Game] Player {session.SessionId} joined at slot {i}");
+                    LogWithTimestamp($"[Game] Player {session.SessionId} joined at slot {i}");
                     return true;
                 }
             }
 
             // 모든 슬롯이 찼을 경우
-            Console.WriteLine("[Game] Cannot join - game is full");
+            LogWithTimestamp("[Game] Cannot join - game is full");
             return false;
         }
 
@@ -316,7 +327,7 @@ namespace BaseServer.Core.Game.Entities
                 {
                     // 플레이어 슬롯 정리
                     m_players[i].Cleanup();
-                    Console.WriteLine($"[Game] Player {session.SessionId} left from slot {i}");
+                    LogWithTimestamp($"[Game] Player {session.SessionId} left from slot {i}");
                     return true;
                 }
             }
@@ -347,7 +358,7 @@ namespace BaseServer.Core.Game.Entities
             // 게임 상태 확인 (WAITING 상태에서만 시작 가능)
             if (m_gameState != GAMESTATE_WAITING)
             {
-                Console.WriteLine($"[Game] Cannot start - invalid state: {m_gameState}");
+                LogWithTimestamp($"[Game] Cannot start - invalid state: {m_gameState}");
                 return false;
             }
 
@@ -355,7 +366,7 @@ namespace BaseServer.Core.Game.Entities
             MapData? staticMapData = m_mapManager.LoadMapData(mapIndex);
             if (staticMapData == null)
             {
-                Console.WriteLine($"[Game] Failed to load map data (index: {mapIndex})");
+                LogWithTimestamp($"[Game] Failed to load map data (index: {mapIndex})");
                 return false;
             }
 
@@ -374,7 +385,7 @@ namespace BaseServer.Core.Game.Entities
             m_gameLoopCts = new CancellationTokenSource();                // 게임 루프 취소 토큰 생성
 
             await BroadcastGameStart();
-            Console.WriteLine($"[Game] Game started with map {mapIndex}");
+            LogWithTimestamp($"[Game] Game started with map {mapIndex}");
 
             // 게임 루프를 별도 Task로 시작 (비동기 실행)
             _ = Task.Run(() => GameLoop(m_gameLoopCts.Token));
@@ -398,7 +409,7 @@ namespace BaseServer.Core.Game.Entities
         {
             const float deltaTime = FIXED_TICK_RATE; // 고정 델타타임 (50ms)
 
-            Console.WriteLine("[Game] Game loop started");
+            LogWithTimestamp("[Game] Game loop started");
 
             try
             {
@@ -424,25 +435,25 @@ namespace BaseServer.Core.Game.Entities
                     else if (delay < -0.01) // 10ms 이상 지연되면 경고
                     {
                         // 틱 처리가 목표 시간보다 오래 걸린 경우
-                        Console.WriteLine($"[Game] Tick {m_tickCount} lagging: {-delay * 1000:F2}ms behind");
+                        LogWithTimestamp($"[Game] Tick {m_tickCount} lagging: {-delay * 1000:F2}ms behind");
                     }
                 }
             }
             catch (OperationCanceledException)
             {
                 // 게임 루프가 취소된 경우 (정상 종료)
-                Console.WriteLine("[Game] Game loop cancelled");
+                LogWithTimestamp("[Game] Game loop cancelled");
             }
             catch (Exception ex)
             {
                 // 예상치 못한 예외 발생 (비정상 종료)
-                Console.WriteLine($"[Game] Fatal error in game loop: {ex.Message}\n{ex.StackTrace}");
+                LogWithTimestamp($"[Game] Fatal error in game loop: {ex.Message}\n{ex.StackTrace}");
                 m_gameState = GAMESTATE_ENDED;
             }
             finally
             {
                 // 게임 루프 종료 시 리소스 정리
-                Console.WriteLine("[Game] Game loop ended");
+                LogWithTimestamp("[Game] Game loop ended");
                 Cleanup();
             }
         }
@@ -594,7 +605,7 @@ namespace BaseServer.Core.Game.Entities
             if (m_gameState == GAMESTATE_ENDED)
                 return;
 
-            Console.WriteLine("[Game] Stopping game...");
+            LogWithTimestamp("[Game] Stopping game...");
             m_gameState = GAMESTATE_ENDED;
             m_gameLoopCts?.Cancel(); // 게임 루프 취소
         }
@@ -607,7 +618,7 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void Cleanup()
         {
-            Console.WriteLine("[Game] Cleaning up resources...");
+            LogWithTimestamp("[Game] Cleaning up resources...");
 
             // 게임 상태 종료
             m_gameState = GAMESTATE_ENDED;
@@ -628,7 +639,7 @@ namespace BaseServer.Core.Game.Entities
             // 맵 정리
             m_gameMap = null;
 
-            Console.WriteLine("[Game] Cleanup completed");
+            LogWithTimestamp("[Game] Cleanup completed");
         }
         #endregion
 
@@ -689,7 +700,7 @@ namespace BaseServer.Core.Game.Entities
 
                     default:
                         // 알 수 없는 명령 타입
-                        Console.WriteLine($"[Game] Unknown command type: {command.Type}");
+                        LogWithTimestamp($"[Game] Unknown command type: {command.Type}");
                         break;
                 }
             }
@@ -697,7 +708,7 @@ namespace BaseServer.Core.Game.Entities
             {
                 // 명령 실행 중 예외 발생 시 로그 출력
                 // 한 명령의 실패가 전체 게임을 멈추지 않도록 함
-                Console.WriteLine($"[Game] Error executing command (Type: {command.Type}, Player: {command.PlayerId}): {ex.Message}");
+                LogWithTimestamp($"[Game] Error executing command (Type: {command.Type}, Player: {command.PlayerId}): {ex.Message}");
             }
         }
 
@@ -711,26 +722,26 @@ namespace BaseServer.Core.Game.Entities
             // 타입 캐스팅 및 검증
             if (command is not MoveFleetCommand moveCommand)
             {
-                Console.WriteLine($"[Game] Invalid MoveFleetCommand");
+                LogWithTimestamp($"[Game] Invalid MoveFleetCommand");
                 return;
             }
             var fleetId = moveCommand.TargetFleet;
             var playerId = moveCommand.PlayerId;
             var planetId = moveCommand.TargetPlanetId;
             // 이동 명령 실행
-            Console.WriteLine($"[Game] Move fleet command: Player {playerId}, " +
+            LogWithTimestamp($"[Game] Move fleet command: Player {playerId}, " +
                 $"Fleet {fleetId} -> Planet {planetId}");
 
             if (!m_dic_fleets.ContainsKey(fleetId))
             {
-                Console.WriteLine($"[Game] Invalid TargetFleet!! : TargetFleet = {fleetId}");
+                LogWithTimestamp($"[Game] Invalid TargetFleet!! : TargetFleet = {fleetId}");
                 return;
             }
 
             var planet = m_gameMap?.GetPlanet(planetId);
             if (planet == null)
             {
-                Console.WriteLine($"[Game] Invalid TargetPlanetId!! : TargetPlanetId = {planetId}");
+                LogWithTimestamp($"[Game] Invalid TargetPlanetId!! : TargetPlanetId = {planetId}");
                 return;
             }
 
@@ -749,7 +760,7 @@ namespace BaseServer.Core.Game.Entities
             // 타입 캐스팅 및 검증
             if (command is not ProduceFleetCommand produceCommand)
             {
-                Console.WriteLine($"[Game] Invalid ProduceFleetCommand");
+                LogWithTimestamp($"[Game] Invalid ProduceFleetCommand");
                 return;
             }
 
@@ -759,7 +770,7 @@ namespace BaseServer.Core.Game.Entities
             // DB에서 생산 정보 조회
             if (!m_dbManager.Table.Production_info.TryGetValue(targetId, out var produceFleetData))
             {
-                Console.WriteLine($"[Game] Invalid production target ID: {targetId}");
+                LogWithTimestamp($"[Game] Invalid production target ID: {targetId}");
                 return;
             }
             // 유효한 키 찾을때까지 반복
@@ -773,7 +784,7 @@ namespace BaseServer.Core.Game.Entities
                     continue;
 
                 // 생산 컨트롤러에게 생산 요청
-                Console.WriteLine($"[Game] Produce fleet command: Player {playerId}, Target {targetId}");
+                LogWithTimestamp($"[Game] Produce fleet command: Player {playerId}, Target {targetId}");
                 m_produceController.RequestProcess(produceFleetData, playerId, id);
                 break;
             }
@@ -902,7 +913,7 @@ namespace BaseServer.Core.Game.Entities
         {
             if (m_gameMap == null)
             {
-                Console.WriteLine("[Game] m_gameMap == null");
+                LogWithTimestamp("[Game] m_gameMap == null");
                 return;
             }
             GameState state = new GameState(m_gameMap, m_players, m_dic_fleets, m_gameState);
@@ -944,7 +955,7 @@ namespace BaseServer.Core.Game.Entities
                 m_gameLoopCts?.Dispose();   // CancellationTokenSource 해제
                 m_commandSemaphore?.Dispose(); // SemaphoreSlim 해제
 
-                Console.WriteLine("[Game] Disposed");
+                LogWithTimestamp("[Game] Disposed");
             }
 
             m_disposed = true;

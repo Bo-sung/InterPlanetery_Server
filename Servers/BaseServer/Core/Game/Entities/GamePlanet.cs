@@ -54,5 +54,11 @@ namespace BaseServer.Core.Game.Entities
                 ConquestProgress--;
             }
         }
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
     }
 }

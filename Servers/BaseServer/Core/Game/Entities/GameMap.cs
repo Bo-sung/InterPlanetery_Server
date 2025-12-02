@@ -109,5 +109,11 @@ namespace BaseServer.Core.Game.Entities
                 return val;
             return null;
         }
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
     }
 }

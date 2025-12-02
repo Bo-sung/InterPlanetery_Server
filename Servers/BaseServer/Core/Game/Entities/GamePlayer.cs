@@ -229,5 +229,12 @@ namespace BaseServer.Core.Game.Entities
             Supply = tickSup;       // 인구수는 초당 생산이 아니라 케파임.
         }
         #endregion
+
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
     }
 }

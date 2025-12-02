@@ -152,20 +152,26 @@ namespace BaseServer.Core.Game.Entities
             var beforePos = _position;
             _position = Vector2.Lerp(_moveFrom, _moveTo, progress);
 
-            Console.WriteLine($"[GAME] FleetMoved. ID : {ID}, before :{beforePos} After : {_position}");
+            LogWithTimestamp($"[GAME] FleetMoved. ID : {ID}, before :{beforePos} After : {_position}");
         }
         public void PrintInfo()
         {
-            Console.WriteLine($"=== Fleet {this.ID} Info ===");
-            Console.WriteLine($"Name: {this.Name}");
-            Console.WriteLine($"Type: {this._data.Type}");
-            Console.WriteLine($"Health: {this.CurHealth}/{this._data.MaxHealth}");
-            Console.WriteLine($"Attack Power: {this.AttackPower}");
-            Console.WriteLine($"Move Speed: {this.MoveSpeed}");
-            Console.WriteLine($"State: {this.State}");
-            Console.WriteLine($"Owner ID: {this.Owner}");
-            Console.WriteLine($"Position: {this.Position}");
-            Console.WriteLine($"========================");
+            LogWithTimestamp($"=== Fleet {this.ID} Info ===");
+            LogWithTimestamp($"Name: {this.Name}");
+            LogWithTimestamp($"Type: {this._data.Type}");
+            LogWithTimestamp($"Health: {this.CurHealth}/{this._data.MaxHealth}");
+            LogWithTimestamp($"Attack Power: {this.AttackPower}");
+            LogWithTimestamp($"Move Speed: {this.MoveSpeed}");
+            LogWithTimestamp($"State: {this.State}");
+            LogWithTimestamp($"Owner ID: {this.Owner}");
+            LogWithTimestamp($"Position: {this.Position}");
+            LogWithTimestamp($"========================");
+        }
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
         }
     }
 }

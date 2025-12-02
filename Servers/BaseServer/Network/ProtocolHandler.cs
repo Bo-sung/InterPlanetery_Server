@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using CommonLib;
@@ -21,14 +21,20 @@ namespace BaseServer.Network
 			m_handlers = new Dictionary<int, ProtocolHandlerDelegate>();
 		}
 
-		/// <summary>
-		/// 핸들러 등록
-		/// </summary>
-		public void RegisterHandler(int _protocolType, ProtocolHandlerDelegate _handler)
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
+
+        /// <summary>
+        /// 핸들러 등록
+        /// </summary>
+        public void RegisterHandler(int _protocolType, ProtocolHandlerDelegate _handler)
 		{
 			if (m_handlers.ContainsKey(_protocolType))
 			{
-				Console.WriteLine($"[ProtocolHandler] Warning: Handler for protocol type {_protocolType} already exists. Overwriting.");
+				LogWithTimestamp($"[ProtocolHandler] Warning: Handler for protocol type {_protocolType} already exists. Overwriting.");
 			}
 
 			m_handlers[_protocolType] = _handler;
@@ -58,12 +64,12 @@ namespace BaseServer.Network
 				}
 				catch (Exception e)
 				{
-					Console.WriteLine($"[ProtocolHandler] Error handling protocol {_protocol.Type}: {e.Message}");
+					LogWithTimestamp($"[ProtocolHandler] Error handling protocol {_protocol.Type}: {e.Message}");
 				}
 			}
 			else
 			{
-				Console.WriteLine($"[ProtocolHandler] No handler registered for protocol type: {_protocol.Type}");
+				LogWithTimestamp($"[ProtocolHandler] No handler registered for protocol type: {_protocol.Type}");
 			}
 		}
 

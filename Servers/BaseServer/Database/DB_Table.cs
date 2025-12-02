@@ -23,6 +23,17 @@ namespace BaseServer.Database
         public Dictionary<int, PlanetInfoData> Planet_info => m_dic_planet_info;
         public Dictionary<int, ProductionInfoData> Production_info => m_dic_production_info;
 
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
+
+        private void LogErrorWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
 
         public void UpdateTable(string _connectionString)
         {
@@ -82,7 +93,7 @@ namespace BaseServer.Database
         private void LogError(string message)
         {
             // 사용하는 로깅 시스템에 맞게 구현
-            Console.Error.WriteLine($"[ERROR] {DateTime.Now}: {message}");
+            LogErrorWithTimestamp($"[ERROR] {DateTime.Now}: {message}");
 
             // 파일에 로깅하는 예시
             try
@@ -167,7 +178,7 @@ namespace BaseServer.Database
         // 정보 로깅 메소드
         private void LogInfo(string message)
         {
-            Console.WriteLine($"[INFO] {DateTime.Now}: {message}");
+            LogWithTimestamp($"[INFO] {DateTime.Now}: {message}");
 
             // 파일에 로깅하는 예시
             try

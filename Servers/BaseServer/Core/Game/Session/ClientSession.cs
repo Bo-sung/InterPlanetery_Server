@@ -1,4 +1,4 @@
-﻿using BaseServer.Core.Game.Entities;
+using BaseServer.Core.Game.Entities;
 using BaseServer.Core.Game.Managers;
 using BaseServer.Database;
 using BaseServer.Network;

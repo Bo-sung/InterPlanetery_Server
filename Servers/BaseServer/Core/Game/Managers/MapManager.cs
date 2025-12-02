@@ -1,4 +1,4 @@
-using BaseServer.Core.Game.Entities;
+﻿using BaseServer.Core.Game.Entities;
 using BaseServer.Database;
 using CommonLib.TableData;
 using System;
@@ -111,12 +111,19 @@ namespace BaseServer.Core.Game.Managers
 
                 if (m_dic_mapData.TryAdd(mapId, newMapData))
                 {
-                    Console.WriteLine($"[MapManager] Map Seted: {mapId}");
+                    LogWithTimestamp($"[MapManager] Map Seted: {mapId}");
                     return newMapData;
                 }
             }
 
             return newMapData;
+        }
+
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
         }
     }
 }

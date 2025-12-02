@@ -5,6 +5,13 @@ namespace BaseServer.Database
 {
     public sealed class DB_Auth
     {
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
+
         /// <summary>
         /// 로그인 인증 - userinfo 테이블에서 사용자 확인
         /// </summary>
@@ -49,7 +56,7 @@ namespace BaseServer.Database
             catch (Exception ex)
             {
                 // 로그 출력 (실제로는 로깅 시스템 사용)
-                Console.WriteLine($"[DB_Auth] AuthenticateUser Error: {ex.Message}");
+                LogWithTimestamp($"[DB_Auth] AuthenticateUser Error: {ex.Message}");
             }
 
             // 인증 실패
@@ -77,7 +84,7 @@ namespace BaseServer.Database
                         long count = (long)checkCmd.ExecuteScalar();
                         if (count > 0)
                         {
-                            Console.WriteLine($"[DB_Auth] User '{username}' already exists");
+                            LogWithTimestamp($"[DB_Auth] User '{username}' already exists");
                             return false;
                         }
                     }
@@ -95,7 +102,7 @@ namespace BaseServer.Database
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DB_Auth] RegisterUser Error: {ex.Message}");
+                LogWithTimestamp($"[DB_Auth] RegisterUser Error: {ex.Message}");
                 return false;
             }
         }
@@ -124,7 +131,7 @@ namespace BaseServer.Database
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DB_Auth] UserExists Error: {ex.Message}");
+                LogWithTimestamp($"[DB_Auth] UserExists Error: {ex.Message}");
                 return false;
             }
         }

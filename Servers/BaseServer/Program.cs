@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -33,9 +33,9 @@ namespace BaseServer
             {
                 string host = config.GetValue<string>("Server:Host");
                 int port = config.GetValue<int>("Server:Port");
-                
+
                 IPAddress localAddr;
-                
+
                 // 1. IP 주소 문자열인지 먼저 확인 (0.0.0.0, 127.0.0.1 등)
                 if (IPAddress.TryParse(host, out IPAddress parsedIp))
                 {
@@ -55,7 +55,7 @@ namespace BaseServer
                     IPAddress[] addresses = Dns.GetHostAddresses(host);
                     if (addresses.Length == 0)
                     {
-                        Console.WriteLine($"[ERROR] Could not resolve host: {host}");
+                        LogWithTimestamp($"[ERROR] Could not resolve host: {host}");
                         return;
                     }
                     localAddr = addresses[0];
@@ -64,17 +64,17 @@ namespace BaseServer
                 server = new TcpListener(localAddr, port);
                 server.Start();
 
-                Console.WriteLine($"[Server] Listening on {server.LocalEndpoint}");
-                
+                LogWithTimestamp($"[Server] Listening on {server.LocalEndpoint}");
+
                 // 루프백 주소로 바인딩된 경우 경고 출력
                 if (IPAddress.IsLoopback(((IPEndPoint)server.LocalEndpoint).Address))
                 {
-                    Console.WriteLine("[WARNING] Server is bound to loopback address (127.0.0.1). External connections will fail.");
-                    Console.WriteLine("[WARNING] Please check 'appsettings.json' and set 'Server:Host' to '0.0.0.0'.");
+                    LogWithTimestamp("[WARNING] Server is bound to loopback address (127.0.0.1). External connections will fail.");
+                    LogWithTimestamp("[WARNING] Please check 'appsettings.json' and set 'Server:Host' to '0.0.0.0'.");
                 }
 
-                Console.WriteLine("[Server] Waiting for clients to connect...");
-                Console.WriteLine();
+                LogWithTimestamp("[Server] Waiting for clients to connect...");
+                LogWithTimestamp("");
 
                 while (true)
                 {
@@ -85,18 +85,27 @@ namespace BaseServer
             }
             catch (SocketException e)
             {
-                Console.WriteLine($"[Server] SocketException: {e}");
+                LogWithTimestamp($"[Server] SocketException: {e}");
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[Server] Exception: {e}");
+                LogWithTimestamp($"[Server] Exception: {e}");
             }
             finally
             {
                 server?.Stop();
                 RoomManager.Instance.Shutdown();
-                Console.WriteLine("[Server] Shutdown complete");
+                LogWithTimestamp("[Server] Shutdown complete");
             }
+        }
+
+        /// <summary>
+        /// 타임스탬프가 있는 로그 출력
+        /// </summary>
+        static void LogWithTimestamp(string message)
+        {
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            Console.WriteLine($"[{timestamp}] {message}");
         }
     }
 }

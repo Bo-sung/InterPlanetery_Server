@@ -47,6 +47,12 @@ namespace BaseServer.Core.Game.Managers
             }
         }
 
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
+
         /// <summary>
         /// 새로운 룸 생성
         /// </summary>
@@ -59,7 +65,7 @@ namespace BaseServer.Core.Game.Managers
 
             if (m_rooms.TryAdd(roomIdString, room))
             {
-                Console.WriteLine($"[RoomManager] Room created: {roomIdString}");
+                LogWithTimestamp($"[RoomManager] Room created: {roomIdString}");
                 return room;
             }
 
@@ -97,7 +103,7 @@ namespace BaseServer.Core.Game.Managers
         {
             if (m_rooms.TryRemove(_roomId, out GameRoom room))
             {
-                Console.WriteLine($"[RoomManager] Room removed: {_roomId}");
+                LogWithTimestamp($"[RoomManager] Room removed: {_roomId}");
                 return true;
             }
             return false;
@@ -114,13 +120,13 @@ namespace BaseServer.Core.Game.Managers
             {
                 if (m_rooms.TryRemove(kvp.Key, out GameRoom room))
                 {
-                    Console.WriteLine($"[RoomManager] Cleaned up empty room: {kvp.Key}");
+                    LogWithTimestamp($"[RoomManager] Cleaned up empty room: {kvp.Key}");
                 }
             }
 
             if (emptyRooms.Count > 0)
             {
-                Console.WriteLine($"[RoomManager] Total rooms: {m_rooms.Count}");
+                LogWithTimestamp($"[RoomManager] Total rooms: {m_rooms.Count}");
             }
         }
 
@@ -157,10 +163,10 @@ namespace BaseServer.Core.Game.Managers
         /// </summary>
         public void PrintStatus()
         {
-            Console.WriteLine($"[RoomManager] Total rooms: {m_rooms.Count}");
+            LogWithTimestamp($"[RoomManager] Total rooms: {m_rooms.Count}");
             foreach (var kvp in m_rooms)
             {
-                Console.WriteLine($"  - {kvp.Key}: {kvp.Value.PlayerCount}/{GameRoom.MaxPlayers} players");
+                LogWithTimestamp($"  - {kvp.Key}: {kvp.Value.PlayerCount}/{GameRoom.MaxPlayers} players");
             }
         }
 
@@ -177,7 +183,8 @@ namespace BaseServer.Core.Game.Managers
             }
 
             m_rooms.Clear();
-            Console.WriteLine("[RoomManager] Shutdown complete");
+            LogWithTimestamp("[RoomManager] Shutdown complete");
         }
+
     }
 }

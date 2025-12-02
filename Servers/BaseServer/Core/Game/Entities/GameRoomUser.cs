@@ -208,10 +208,16 @@ namespace BaseServer.Core.Game.Entities
             // 응답 전송 후 방에서 제거
             if (!m_session.CurrentRoom.TryRemovePlayer(m_session))
             {
-                Console.WriteLine($"[GameRoomUser] 방 퇴장 처리 중 오류 발생 (User: {m_id})");
+                LogWithTimestamp($"[GameRoomUser] 방 퇴장 처리 중 오류 발생 (User: {m_id})");
             }
 
             return;
+        }
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
         }
         #endregion
     }

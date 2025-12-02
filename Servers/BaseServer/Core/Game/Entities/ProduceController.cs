@@ -29,6 +29,12 @@ namespace BaseServer.Core.Game.Entities
             this._db = db.Table;
         }
 
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
+        }
+
         public bool IsOnProduction(long id)
         {
             return productions.Contains(id);
@@ -40,7 +46,7 @@ namespace BaseServer.Core.Game.Entities
             var data = GetProductionInfoDataFromDB(fleetType);
             if (data == null)
             {
-                Console.WriteLine($"ProductionInfoData not found: {fleetType}");
+                LogWithTimestamp($"ProductionInfoData not found: {fleetType}");
                 return;
             }
             
@@ -59,7 +65,7 @@ namespace BaseServer.Core.Game.Entities
             FleetInfoData fleetData = GetFleetDataFromDB(productionData.Targetid);
             if (fleetData == null)
             {
-                Console.WriteLine($"FleetInfoData not found: {productionData.Targetid}");
+                LogWithTimestamp($"FleetInfoData not found: {productionData.Targetid}");
                 return;
             }
 
@@ -74,7 +80,7 @@ namespace BaseServer.Core.Game.Entities
 
             productionQueue[playerId].Add(production);
             productions.Add(nextFleetId);
-            Console.WriteLine($"Player {playerId} started producing fleet {production.Fleet.ID}");
+            LogWithTimestamp($"Player {playerId} started producing fleet {production.Fleet.ID}");
         }
 
         // 매 틱마다 호출되어 생산 상태 업데이트
@@ -112,7 +118,7 @@ namespace BaseServer.Core.Game.Entities
         // 생산 완료 처리
         private void HandleProduceComplete(ProductionInfo production)
         {
-            Console.WriteLine($"Fleet {production.Fleet.ID} production completed for player {production.PlayerId}");
+            LogWithTimestamp($"Fleet {production.Fleet.ID} production completed for player {production.PlayerId}");
 
             // FleetController로 완성된 Fleet 전달
             OnProductionFinish?.Invoke(production.Fleet);

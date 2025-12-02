@@ -99,7 +99,14 @@ namespace BaseServer.Core.Game.Entities
                 m_users[i].OnChangedReady += HandleOnReady;
             }
 
-            Console.WriteLine($"[Room {RoomId}] Created with MapID: {MapID}");
+            LogWithTimestamp($"[Room {RoomId}] Created with MapID: {MapID}");
+        }
+
+
+        private void LogWithTimestamp(string message)
+        {
+            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            System.Console.WriteLine($"[{timestamp}] {message}");
         }
         #endregion
 
@@ -125,12 +132,12 @@ namespace BaseServer.Core.Game.Entities
                 bool allPlayersReady = m_users.All(user =>
                     user != null && user.IsValid && user.IsReady);
 
-                Console.WriteLine($"[Room {RoomId}] players ready changed.IsAllReady = {allPlayersReady}");
+                LogWithTimestamp($"[Room {RoomId}] players ready changed.IsAllReady = {allPlayersReady}");
                 if (!allPlayersReady)
                     return;
 
                 // 게임 시작
-                Console.WriteLine($"[Room {RoomId}] All players ready. Starting game...");
+                LogWithTimestamp($"[Room {RoomId}] All players ready. Starting game...");
 
                 foreach (var user in m_users)
                 {
@@ -165,7 +172,7 @@ namespace BaseServer.Core.Game.Entities
                 Broadcast(proto);
             }
 
-            Console.WriteLine($"[Room {RoomId}] Info updated - Name: {Name}, MapID: {MapID}");
+            LogWithTimestamp($"[Room {RoomId}] Info updated - Name: {Name}, MapID: {MapID}");
         }
 
         public (string roomId, RoomInfo roomInfo, WaittingRoomUser[] waitusers) GetRoomInfo()
@@ -216,7 +223,7 @@ namespace BaseServer.Core.Game.Entities
 
             await Task.WhenAll(tasks);
 
-            Console.WriteLine($"[Room {RoomId}] Closed notification sent to {validUsers.Count} players");
+            LogWithTimestamp($"[Room {RoomId}] Closed notification sent to {validUsers.Count} players");
         }
 
         public void Dispose()
@@ -237,7 +244,7 @@ namespace BaseServer.Core.Game.Entities
                 gameInstance?.Dispose();
             }
 
-            Console.WriteLine($"[Room {RoomId}] Disposed");
+            LogWithTimestamp($"[Room {RoomId}] Disposed");
         }
         #endregion
 
@@ -264,7 +271,7 @@ namespace BaseServer.Core.Game.Entities
         {
             if (session == null)
             {
-                Console.WriteLine($"[Room {RoomId}] Cannot add null session");
+                LogWithTimestamp($"[Room {RoomId}] Cannot add null session");
                 return false;
             }
 
@@ -272,7 +279,7 @@ namespace BaseServer.Core.Game.Entities
             {
                 if (slot < 0 || slot >= MaxPlayers)
                 {
-                    Console.WriteLine($"[Room {RoomId}] Invalid slot: {slot}");
+                    LogWithTimestamp($"[Room {RoomId}] Invalid slot: {slot}");
                     return false;
                 }
 
@@ -284,7 +291,7 @@ namespace BaseServer.Core.Game.Entities
                     m_users[slot].Initialize(session);
                     session.CurrentRoom = this;
 
-                    Console.WriteLine($"[Room {RoomId}] Player {session.SessionId} joined at slot {slot}. ({PlayerCount}/{MaxPlayers})");
+                    LogWithTimestamp($"[Room {RoomId}] Player {session.SessionId} joined at slot {slot}. ({PlayerCount}/{MaxPlayers})");
 
                     // 다른 플레이어에게 입장 알림
                     BroadcastUserJoined(m_users[slot]);
@@ -292,7 +299,7 @@ namespace BaseServer.Core.Game.Entities
                     return true;
                 }
 
-                Console.WriteLine($"[Room {RoomId}] Slot {slot} is already occupied");
+                LogWithTimestamp($"[Room {RoomId}] Slot {slot} is already occupied");
                 return false;
             }
         }
@@ -331,7 +338,7 @@ namespace BaseServer.Core.Game.Entities
 
                 m_users[slot].Cleanup();
 
-                Console.WriteLine($"[Room {RoomId}] Player {playerId} ({playerName}) left. ({PlayerCount}/{MaxPlayers})");
+                LogWithTimestamp($"[Room {RoomId}] Player {playerId} ({playerName}) left. ({PlayerCount}/{MaxPlayers})");
 
                 // 다른 플레이어에게 퇴장 알림
                 BroadcastUserLeft(playerId);
@@ -357,7 +364,7 @@ namespace BaseServer.Core.Game.Entities
 
                 Array.Clear(m_users, 0, m_users.Length);
 
-                Console.WriteLine($"[Room {RoomId}] Closed all connections ({disconnectedCount} players)");
+                LogWithTimestamp($"[Room {RoomId}] Closed all connections ({disconnectedCount} players)");
             }
         }
         #endregion
@@ -367,7 +374,7 @@ namespace BaseServer.Core.Game.Entities
         {
             if (command == null)
             {
-                Console.WriteLine($"[Room {RoomId}] Cannot send null command");
+                LogWithTimestamp($"[Room {RoomId}] Cannot send null command");
                 return;
             }
 
@@ -480,7 +487,7 @@ namespace BaseServer.Core.Game.Entities
             }
             catch (Exception e)
             {
-                Console.WriteLine($"[Room {RoomId}] Failed to send {messageType}: {e.Message}");
+                LogWithTimestamp($"[Room {RoomId}] Failed to send {messageType}: {e.Message}");
             }
         }
         #endregion
