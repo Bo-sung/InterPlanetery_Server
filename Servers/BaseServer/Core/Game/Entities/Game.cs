@@ -1,4 +1,4 @@
-using BaseServer.Core.Game.Managers;
+﻿using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
 using BaseServer.Database;
 using CommonLib.Commands;
@@ -298,7 +298,7 @@ namespace BaseServer.Core.Game.Entities
                 if (m_players[i] != null && !m_players[i].IsValid)
                 {
                     // 플레이어 초기화 및 세션 연결
-                    m_players[i].Initilaize(session, commandSender);
+                    m_players[i].Initialize(session, commandSender);
                     LogWithTimestamp($"[Game] Player {session.SessionId} joined at slot {i}");
                     return true;
                 }
@@ -374,7 +374,12 @@ namespace BaseServer.Core.Game.Entities
             m_gameMap = new GameMap(staticMapData);
             m_produceController.OnProductionFinish += HandleOnProductionFinish;
 
-            // 모든 유저 준비 전까지 대기
+            LogWithTimestamp($"[Game] Broadcasting GameSet to all clients...");
+            // 1단계: 모든 플레이어에게 GameSet 정보 전송
+            await BroadcastGameSet(staticMapData);
+
+            LogWithTimestamp($"[Game] Waiting for all clients to acknowledge GameSet...");
+            // 2단계: 모든 클라이언트에서 REQUEST_GAME_CL_READY를 받을 때까지 대기
             await WaitUntilUsersReadyAll();
 
             // 게임 상태 초기화
@@ -486,6 +491,7 @@ namespace BaseServer.Core.Game.Entities
         {
             int readyRequireCount = m_players.Length;
             var tcs = new TaskCompletionSource<bool>();
+            const int TIMEOUT_MS = 15000; // 15초 타임아웃
 
             Action handler = null;
             handler = () =>
@@ -510,7 +516,46 @@ namespace BaseServer.Core.Game.Entities
                 player.OnUserReady += handler;
             }
 
-            await tcs.Task;
+            // 타임아웃 처리
+            var timeoutTask = Task.Delay(TIMEOUT_MS);
+            var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
+
+            if (completedTask == timeoutTask)
+            {
+                // 타임아웃 발생 - 이벤트 핸들러 정리 및 로그
+                LogWithTimestamp($"[Game] WaitUntilUsersReadyAll timeout ({TIMEOUT_MS}ms) - Ready count: {readyRequireCount}/{m_players.Length}");
+
+                foreach (var player in m_players)
+                {
+                    player.OnUserReady -= handler;
+                }
+
+                // 타임아웃 시에도 게임 시작
+                LogWithTimestamp($"[Game] Forcing game start despite timeout");
+            }
+            else
+            {
+                LogWithTimestamp($"[Game] All players ready");
+            }
+        }
+
+        private async Task BroadcastGameSet(MapData mapData)
+        {
+            if (mapData == null)
+            {
+                LogWithTimestamp($"[Game] BroadcastGameSet failed - mapData is null");
+                return;
+            }
+
+            foreach (var player in m_players)
+            {
+                if (player != null && player.IsValid)
+                {
+                    await player.Async_SendGameSet(mapData);
+                }
+            }
+
+            LogWithTimestamp($"[Game] GameSet broadcasted to all players");
         }
 
         private async Task BroadcastGameStart()

@@ -82,7 +82,7 @@ namespace BaseServer.Core.Game.Entities
         }
 
         #region 초기화 및 정리
-        public void Initilaize(ClientSession clientSession, ICommandSender sender)
+        public void Initialize(ClientSession clientSession, ICommandSender sender)
         {
             this.clientSession = clientSession;
             this.commandSender = sender;
