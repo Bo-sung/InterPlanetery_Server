@@ -657,7 +657,7 @@ namespace BaseServer.Core.Game.Session
             response.AddParam("chatChannelId", room.ChatChID);
             response.AddParam("roomId", temp.roomId);
             response.AddStruct<RoomInfo>("roomInfo", temp.roomInfo);
-            response.AddParam("users", temp.waitusers);
+            response.AddObject("users", temp.waitusers);
             await SendAsync(response.Serialize());
         }
 
@@ -724,7 +724,7 @@ namespace BaseServer.Core.Game.Session
         /// <summary>
         /// 정리 작업
         /// </summary>
-        private void Cleanup()
+        private void Cleanup()  
         {
             // 룸에서 제거
             if (CurrentRoom != null)

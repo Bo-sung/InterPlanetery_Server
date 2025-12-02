@@ -20,6 +20,9 @@ namespace ChatClientWPF.ViewModels
         {
             _chatModel = new ChatClientModel();
             _chatModel.OnError += OnError;
+            _chatModel.OnGameStarted += OnGameStarted;
+            
+            // Start with Login View
             
             // Start with Login View
             NavigateToLogin();
@@ -50,8 +53,15 @@ namespace ChatClientWPF.ViewModels
 
         public void NavigateToGame()
         {
-            // Placeholder for Game View
-            // CurrentViewModel = new GameViewModel(this);
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                CurrentViewModel = new GameViewModel(this);
+            });
+        }
+
+        private void OnGameStarted()
+        {
+            NavigateToGame();
         }
     }
 }

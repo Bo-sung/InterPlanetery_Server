@@ -1,4 +1,4 @@
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 using System.Text;
 using CommonLib;
 using ProtoType = CommonLib.ProtocolType;
@@ -627,7 +627,7 @@ namespace TestClient
                     case ProtoType.REQUEST_JOIN_LOBBY:
                         int roomCount = protocol.GetParam<int>("roomCount");
                         int page = protocol.GetParam<int>("page");
-                        var roomList = protocol.GetParam<RoomInfo[]>("roomList");
+                        var roomList = protocol.GetObject<RoomInfo[]>("roomList");
                         Console.WriteLine($"[Join Lobby Success]");
                         Console.WriteLine($"  Total Rooms: {roomCount}, Page: {page}");
                         if (roomList != null && roomList.Length > 0)
@@ -645,7 +645,7 @@ namespace TestClient
                         break;
 
                     case ProtoType.REFRESH_LOBBY:
-                        var refreshRoomList = protocol.GetParam<RoomInfo[]>("roomList");
+                        var refreshRoomList = protocol.GetObject<RoomInfo[]>("roomList");
                         Console.WriteLine($"[Refresh Lobby Success]");
                         if (refreshRoomList != null && refreshRoomList.Length > 0)
                         {
@@ -688,7 +688,7 @@ namespace TestClient
 
                     case ProtoType.REQUEST_REFRESH_JOINED_ROOM_INFO:
                         var refreshedRoomInfo = protocol.GetStruct<RoomInfo>("roomInfo");
-                        var users = protocol.GetParam<WaittingRoomUser[]>("users");
+                        var users = protocol.GetObject<WaittingRoomUser[]>("users");
                         Console.WriteLine($"[Refresh Room Info Success]");
                         Console.WriteLine($"  Room: {refreshedRoomInfo.RoomId} - {refreshedRoomInfo.RoomName}");
                         Console.WriteLine($"  Players: {refreshedRoomInfo.PlayerCount}/{refreshedRoomInfo.MaxPlayers}");

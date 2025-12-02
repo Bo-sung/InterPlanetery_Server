@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CommonLib;
+
 using ProtoType = CommonLib.ProtocolType;
 
 namespace ChatClientWPF.Models
@@ -42,6 +45,11 @@ namespace ChatClientWPF.Models
 
         // Chat Events
         public event Action<ChatMessage>? OnChatMessageReceived;
+
+        // Game Events
+        public event Action? OnGameStarted;
+        public event Action<long>? OnGameState; // serverTick
+        public event Action? OnGameEnded;
 
         // Exposed properties
         public bool IsConnected => _isConnected;
@@ -197,50 +205,102 @@ namespace ChatClientWPF.Models
         // Receive Loop
         // ---------------------------------------------------------------------
 
-        private async Task ReceiveLoop(CancellationToken token)
+        private async Task ReceiveLoop(CancellationToken cancellationToken)
         {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ReceiveLoop] 시작!");
             byte[] lengthBuffer = new byte[4];
 
-            while (_isConnected && _stream != null && !token.IsCancellationRequested)
+            try
             {
-                try
+                while (_isConnected && !cancellationToken.IsCancellationRequested)
                 {
-                    int bytesRead = await _stream.ReadAsync(lengthBuffer, 0, 4, token);
-                    if (bytesRead == 0) break;
+                    if (_stream == null || !_stream.CanRead)
+                        break;
 
-                    int messageLength = BitConverter.ToInt32(lengthBuffer, 0);
-                    if (messageLength <= 0 || messageLength > 1024 * 1024 * 10) // 10MB limit
+                    // 1. 메시지 길이 읽기 (4바이트)
+                    int bytesRead = 0;
+                    try
                     {
-                        OnError?.Invoke($"Invalid message length: {messageLength}");
+                        bytesRead = await _stream.ReadAsync(lengthBuffer, 0, 4, cancellationToken);
+                    }
+                    catch (Exception) when (cancellationToken.IsCancellationRequested)
+                    {
                         break;
                     }
 
-                    byte[] messageBuffer = new byte[messageLength + 4];
+                    if (bytesRead == 0)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ChatClientModel] 서버 연결이 종료되었습니다. (Read 0 bytes)");
+                        break;
+                    }
+
+                    if (bytesRead < 4)
+                    {
+                        int remaining = 4 - bytesRead;
+                        while (remaining > 0)
+                        {
+                            int read = await _stream.ReadAsync(lengthBuffer, 4 - remaining, remaining, cancellationToken);
+                            if (read == 0) throw new EndOfStreamException("Connection closed while reading length");
+                            remaining -= read;
+                        }
+                    }
+
+                    int messageLength = BitConverter.ToInt32(lengthBuffer, 0);
+
+                    // 유효성 검사
+                    if (messageLength <= 0 || messageLength > 1024 * 1024)
+                    {
+                        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ChatClientModel] 잘못된 메시지 길이: {messageLength}");
+                        break;
+                    }
+
+                    // 2. 전체 메시지 읽기
+                    byte[] messageBuffer = new byte[messageLength];
                     Array.Copy(lengthBuffer, 0, messageBuffer, 0, 4);
 
-                    int totalRead = 0;
+                    int totalRead = 4;
                     while (totalRead < messageLength)
                     {
-                        bytesRead = await _stream.ReadAsync(messageBuffer, 4 + totalRead, messageLength - totalRead, token);
-                        if (bytesRead == 0) break;
-                        totalRead += bytesRead;
+                        int toRead = messageLength - totalRead;
+                        int read = await _stream.ReadAsync(messageBuffer, totalRead, toRead, cancellationToken);
+                        if (read == 0)
+                            throw new EndOfStreamException("Connection closed while reading body");
+                        totalRead += read;
                     }
 
-                    var protocol = Protocol.Deserialize(messageBuffer);
-                    if (protocol != null)
+                    // 3. 역직렬화 및 처리
+                    try
                     {
-                        HandleProtocol(protocol);
+                        Protocol protocol = Protocol.Deserialize(messageBuffer);
+                        if (protocol != null)
+                        {
+                            HandleProtocol(protocol);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ChatClientModel] 프로토콜 처리 오류: {ex.Message}");
                     }
                 }
-                catch (OperationCanceledException) { break; }
-                catch (Exception ex)
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ChatClientModel] 수신 루프 취소됨");
+            }
+            catch (Exception e)
+            {
+                if (_isConnected)
                 {
-                    OnError?.Invoke($"Receive error: {ex.Message}");
-                    break;
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ChatClientModel] 수신 루프 치명적 오류: {e.Message}");
+                    OnError?.Invoke($"Receive error: {e.Message}");
+                    Disconnect();
                 }
             }
-            Disconnect();
-            OnError?.Invoke("Disconnected from server.");
+            finally
+            {
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] [ChatClientModel] 수신 루프 종료");
+
+            }
         }
 
         private async Task HeartbeatLoop(CancellationToken token)
@@ -290,7 +350,8 @@ namespace ChatClientWPF.Models
                 case ProtoType.ROOM_INFO_CHANGED:
                     {
                         var rInfo = protocol.GetStruct<RoomInfo>("roomInfo");
-                        OnRoomInfoChanged?.Invoke(rInfo);
+                        var users = protocol.GetObject<WaittingRoomUser[]>("users");
+                        OnRoomInfoRefreshed?.Invoke(rInfo, users ?? new WaittingRoomUser[0]);
                     }
                     break;
                 case ProtoType.ROOM_CLOSED:
@@ -306,6 +367,18 @@ namespace ChatClientWPF.Models
                         var chatMsg = protocol.GetStruct<ChatMessage>("chatMessage");
                         OnChatMessageReceived?.Invoke(chatMsg);
                     }
+                    break;
+                case ProtoType.GAME_STARTED:
+                    OnGameStarted?.Invoke();
+                    break;
+                case ProtoType.GAME_STATE:
+                    {
+                        long serverTick = protocol.GetParam<long>("serverTick");
+                        OnGameState?.Invoke(serverTick);
+                    }
+                    break;
+                case ProtoType.GAME_ENDED:
+                    OnGameEnded?.Invoke();
                     break;
             }
         }
@@ -339,13 +412,15 @@ namespace ChatClientWPF.Models
                     {
                         int roomCount = protocol.GetParam<int>("roomCount");
                         int page = protocol.GetParam<int>("page");
-                        var roomList = protocol.GetParam<RoomInfo[]>("roomList");
+                        var roomList = protocol.GetObject<RoomInfo[]>("roomList");
+                        Console.WriteLine($"[Debug] JoinLobby: Count={roomCount}, ListLen={roomList?.Length ?? 0}");
+                        if (roomList != null) foreach (var r in roomList) Console.WriteLine($"[Debug] Room: {r.RoomId}, State={r.RoomState}");
                         OnLobbyJoined?.Invoke(roomCount, page, roomList ?? new RoomInfo[0]);
                     }
                     break;
                 case ProtoType.REFRESH_LOBBY:
                     {
-                        var roomList = protocol.GetParam<RoomInfo[]>("roomList");
+                        var roomList = protocol.GetObject<RoomInfo[]>("roomList");
                         OnRoomListRefreshed?.Invoke(roomList ?? new RoomInfo[0]);
                     }
                     break;
@@ -354,11 +429,16 @@ namespace ChatClientWPF.Models
                         string roomId = protocol.GetParam<string>("roomId");
                         _currentRoomId = roomId;
                         OnRoomCreated?.Invoke(roomId);
+
+                        var roomList = protocol.GetObject<RoomInfo[]>("roomList");
+                        Console.WriteLine($"[Debug] CreateRoom: ListLen={roomList?.Length ?? 0}");
+                        if (roomList != null) foreach (var r in roomList) Console.WriteLine($"[Debug] Room: {r.RoomId}, State={r.RoomState}");
+                        OnRoomListRefreshed?.Invoke(roomList ?? new RoomInfo[0]);
                     }
                     break;
                 case ProtoType.REQUEST_JOIN_ROOM:
                     {
-                        var roomInfo = protocol.GetStruct<RoomInfo>("roominfo");
+                        var roomInfo = protocol.GetStruct<RoomInfo>("roomInfo");
                         int chatChannelId = protocol.GetParam<int>("chatChannelId");
                         _currentRoomId = roomInfo.RoomId;
                         OnRoomJoined?.Invoke(roomInfo, chatChannelId);
@@ -370,7 +450,7 @@ namespace ChatClientWPF.Models
                 case ProtoType.REQUEST_REFRESH_JOINED_ROOM_INFO:
                     {
                         var roomInfo = protocol.GetStruct<RoomInfo>("roomInfo");
-                        var users = protocol.GetParam<WaittingRoomUser[]>("users");
+                        var users = protocol.GetObject<WaittingRoomUser[]>("users");
                         OnRoomInfoRefreshed?.Invoke(roomInfo, users ?? new WaittingRoomUser[0]);
                     }
                     break;

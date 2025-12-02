@@ -24,6 +24,9 @@
         <DataTemplate DataType="{x:Type viewmodels:RoomViewModel}">
             <views:RoomView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewmodels:GameViewModel}">
+            <views:GameView/>
+        </DataTemplate>
     </Window.Resources>
 
     <TabControl>

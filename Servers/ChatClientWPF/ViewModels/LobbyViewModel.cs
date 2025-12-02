@@ -1,4 +1,4 @@
-using ChatClientWPF.Models;
+﻿using ChatClientWPF.Models;
 using CommonLib;
 using System.Collections.ObjectModel;
 using System.Windows;
@@ -17,7 +17,7 @@ namespace ChatClientWPF.ViewModels
         public ObservableCollection<RoomInfo> RoomList
         {
             get => _roomList;
-            set => SetProperty(ref _roomList, value);
+            set => SetProperty(ref _roomList, value);   
         }
 
         public string NewRoomName

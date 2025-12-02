@@ -45,6 +45,7 @@ namespace BaseServer.Core.Game.Entities
                         RoomState = State,
                         MaxPlayers = MaxPlayers,
                         PlayerCount = PlayerCount,
+                        MapID = MapID,
                     };
                 }
             }
