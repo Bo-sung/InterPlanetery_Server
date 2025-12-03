@@ -1,6 +1,7 @@
-using ChatClientWPF.Models;
+﻿using ChatClientWPF.Models;
 using ChatClientWPF.Utils;
 using CommonLib;
+using CommonLib.TableData;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;

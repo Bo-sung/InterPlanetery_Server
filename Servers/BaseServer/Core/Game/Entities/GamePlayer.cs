@@ -113,7 +113,6 @@ namespace BaseServer.Core.Game.Entities
             if (clientSession == null)
                 return;
             clientSession.RegisterProto(ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
-            clientSession.RegisterProto(ProtocolType.REQUEST_GAME_CL_READY, HandleUserReady);
         }
 
         protected virtual void UnRegistorProtos()
@@ -121,7 +120,6 @@ namespace BaseServer.Core.Game.Entities
             if (clientSession == null)
                 return;
             clientSession.UnRegisterProto(ProtocolType.SUBMIT_COMMAND);
-            clientSession.UnRegisterProto(ProtocolType.REQUEST_GAME_CL_READY);
         }
 
         /// <summary>

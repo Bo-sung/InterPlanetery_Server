@@ -1,9 +1,11 @@
+﻿using ChatClientWPF.Utils;
+using CommonLib;
+using CommonLib.TableData;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using ChatClientWPF.Utils;
-using CommonLib;
 using System.Linq;
+using System.Numerics;
+using System.Threading.Tasks;
 
 namespace ChatClientWPF.Models
 {
@@ -46,7 +48,7 @@ namespace ChatClientWPF.Models
         public event Action<string>? OnRoomJoinFailure;
         public event Action<List<RoomInfo>>? OnRoomListUpdated;
         public event Action? OnRoomLeft;
-        public event Action? OnGameStarting; // 게임 시작 알림
+        public event Action OnGameStarting; // 게임 시작 알림
         public event Action<RoomInfo, WaittingRoomUser[]>? OnWaittingRoomInfoChanged; // 방 정보 변경 알림 (WaitingRoom UI용)
         public event Action<int, string, int>? OnUserJoinedRoom; // 유저 입장 알림 (userId, userName, playerCount)
         public event Action<int, string, int>? OnUserLeftRoom; // 유저 퇴장 알림 (userId, userName, playerCount)
@@ -597,6 +599,10 @@ namespace ChatClientWPF.Models
             EmitStatusMessage("게임이 곧 시작됩니다. GameScene으로 전환합니다...");
 
             // 게임 시작 이벤트 발생 (UIWaitingRoom에서 씬 전환 처리)
+            var mapInfo = protocol.GetObject<MapInfoData>("mapinfo");
+            var mapplanetinfo = protocol.GetObject<MapPlanetInfoData[]>("mapplanetinfo");
+            var planets = protocol.GetObject<PlanetInfoData[]>("planets");
+            var routes = protocol.GetObject<MapRouteInfoData[]>("routes");
             OnGameStarting?.Invoke();
 
             await Task.CompletedTask;
