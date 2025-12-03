@@ -75,6 +75,8 @@ namespace ChatClientWPF.ViewModels
             roomManager.OnWaittingRoomInfoChanged += OnWaittingRoomInfoChanged;
             roomManager.OnRoomLeft += OnRoomLeft;
             roomManager.OnGameStarting += OnGameStarting;
+            roomManager.OnUserJoinedRoom += OnUserJoinedRoom;
+            roomManager.OnUserLeftRoom += OnUserLeftRoom;
             roomManager.OnStatusMessage += (msg) => StatusMessage = msg;
             roomManager.OnError += (err) => StatusMessage = "ERROR: " + err;
 
@@ -181,6 +183,26 @@ namespace ChatClientWPF.ViewModels
                 StatusMessage = "게임이 시작됩니다!";
                 MessageBox.Show("게임이 곧 시작됩니다!", "게임 시작");
                 _mainViewModel.NavigateToGame();
+            });
+        }
+
+        private void OnUserJoinedRoom(int userId, string userName, int playerCount)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                StatusMessage = $"{userName}님이 입장했습니다 ({playerCount}명)";
+                // 방 정보 새로고침하여 유저 목록 업데이트
+                ExecuteRefreshRoomInfo(null);
+            });
+        }
+
+        private void OnUserLeftRoom(int userId, string userName, int playerCount)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                StatusMessage = $"{userName}님이 퇴장했습니다 ({playerCount}명)";
+                // 방 정보 새로고침하여 유저 목록 업데이트
+                ExecuteRefreshRoomInfo(null);
             });
         }
     }
