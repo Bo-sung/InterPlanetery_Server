@@ -1,5 +1,7 @@
-﻿using ChatClientWPF.Models;
+using ChatClientWPF.Models;
+using ChatClientWPF.Utils;
 using CommonLib;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -13,11 +15,12 @@ namespace ChatClientWPF.ViewModels
         private string _newRoomName = "New Room";
         private int _selectedMapId = 1;
         private bool _isPrivate;
+        private string _statusMessage = "";
 
         public ObservableCollection<RoomInfo> RoomList
         {
             get => _roomList;
-            set => SetProperty(ref _roomList, value);   
+            set => SetProperty(ref _roomList, value);
         }
 
         public string NewRoomName
@@ -38,6 +41,12 @@ namespace ChatClientWPF.ViewModels
             set => SetProperty(ref _isPrivate, value);
         }
 
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set => SetProperty(ref _statusMessage, value);
+        }
+
         public ICommand RefreshCommand { get; }
         public ICommand CreateRoomCommand { get; }
         public ICommand JoinRoomCommand { get; }
@@ -53,51 +62,61 @@ namespace ChatClientWPF.ViewModels
             JoinRoomCommand = new RelayCommand(ExecuteJoinRoom);
             LogoutCommand = new RelayCommand(ExecuteLogout);
 
-            _mainViewModel.ChatModel.OnLobbyJoined += OnLobbyJoined;
-            _mainViewModel.ChatModel.OnRoomListRefreshed += OnRoomListRefreshed;
-            _mainViewModel.ChatModel.OnRoomCreated += OnRoomCreated;
-            _mainViewModel.ChatModel.OnRoomJoined += OnRoomJoined;
+            // RoomManager 이벤트 구독
+            var roomManager = RoomManager.Instance;
+            roomManager.OnRoomListUpdated += OnRoomListUpdated;
+            roomManager.OnRoomCreateSuccess += OnRoomCreateSuccess;
+            roomManager.OnRoomJoinSuccess += OnRoomJoinSuccess;
+            roomManager.OnRoomJoinFailure += OnRoomJoinFailure;
+            roomManager.OnStatusMessage += (msg) => StatusMessage = msg;
+            roomManager.OnError += (err) => StatusMessage = "ERROR: " + err;
 
-            // Initial load
-            _mainViewModel.ChatModel.JoinLobbyAsync();
+            // Logger 구독
+            Logger.OnLog += (msg) => StatusMessage = msg;
+            Logger.OnLogError += (err) => StatusMessage = "ERROR: " + err;
+
+            StatusMessage = "로비에 접속했습니다";
         }
 
-        private void ExecuteRefresh(object? obj)
+        private async void ExecuteRefresh(object? obj)
         {
-            _mainViewModel.ChatModel.RefreshRoomListAsync();
+            StatusMessage = "방 목록 새로고침 중...";
+            await RoomManager.Instance.RefreshLobbyAsync();
         }
 
-        private void ExecuteCreateRoom(object? obj)
+        private async void ExecuteCreateRoom(object? obj)
         {
-            if (string.IsNullOrWhiteSpace(NewRoomName)) return;
-            _mainViewModel.ChatModel.CreateRoomAsync(NewRoomName, SelectedMapId, IsPrivate);
-        }
-
-        private void ExecuteJoinRoom(object? obj)
-        {
-            if (obj is string roomId)
+            if (string.IsNullOrWhiteSpace(NewRoomName))
             {
-                _mainViewModel.ChatModel.JoinRoomAsync(roomId);
+                MessageBox.Show("방 이름을 입력해주세요.", "입력 오류");
+                return;
+            }
+
+            StatusMessage = $"방 생성 중: {NewRoomName}...";
+            await RoomManager.Instance.RequestCreateRoomAsync(NewRoomName, SelectedMapId, IsPrivate);
+        }
+
+        private async void ExecuteJoinRoom(object? obj)
+        {
+            if (obj is RoomInfo roomInfo)
+            {
+                StatusMessage = $"방 참가 중: {roomInfo.RoomName}...";
+                await RoomManager.Instance.RequestJoinRoomAsync(roomInfo.RoomId);
+            }
+            else if (obj is string roomId)
+            {
+                StatusMessage = $"방 참가 중: {roomId}...";
+                await RoomManager.Instance.RequestJoinRoomAsync(roomId);
             }
         }
 
         private void ExecuteLogout(object? obj)
         {
-            _mainViewModel.ChatModel.Disconnect();
+            ClientServerHandler.Instance.Disconnect();
             _mainViewModel.NavigateToLogin();
         }
 
-        private void OnLobbyJoined(int count, int page, RoomInfo[] rooms)
-        {
-            UpdateRoomList(rooms);
-        }
-
-        private void OnRoomListRefreshed(RoomInfo[] rooms)
-        {
-            UpdateRoomList(rooms);
-        }
-
-        private void UpdateRoomList(RoomInfo[] rooms)
+        private void OnRoomListUpdated(List<RoomInfo> rooms)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -106,19 +125,36 @@ namespace ChatClientWPF.ViewModels
                 {
                     RoomList.Add(room);
                 }
+                StatusMessage = $"방 목록 갱신됨 ({rooms.Count}개)";
             });
         }
 
-        private void OnRoomCreated(string roomId)
-        {
-            // Usually server auto-joins creator, so we wait for OnRoomJoined
-        }
-
-        private void OnRoomJoined(RoomInfo roomInfo, int chatChannelId)
+        private void OnRoomCreateSuccess(string roomId, int slot)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
+                StatusMessage = $"방 생성 성공! RoomID: {roomId}, Slot: {slot}";
+                Logger.Log($"[LobbyViewModel] 방 생성 성공 - RoomID: {roomId}");
+                // 방 생성 후 자동으로 방에 입장되므로 OnRoomJoinSuccess에서 처리
+            });
+        }
+
+        private void OnRoomJoinSuccess(RoomInfo roomInfo)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                StatusMessage = $"방 참가 성공: {roomInfo.RoomName}";
+                Logger.Log($"[LobbyViewModel] 방 참가 성공 - RoomID: {roomInfo.RoomId}");
                 _mainViewModel.NavigateToRoom();
+            });
+        }
+
+        private void OnRoomJoinFailure(string reason)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                StatusMessage = $"방 참가 실패: {reason}";
+                MessageBox.Show($"방에 참가할 수 없습니다:\n{reason}", "참가 실패");
             });
         }
     }

@@ -1,9 +1,10 @@
 using ChatClientWPF.Models;
+using ChatClientWPF.Utils;
 using CommonLib;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using System.Linq;
 
 namespace ChatClientWPF.ViewModels
 {
@@ -15,6 +16,7 @@ namespace ChatClientWPF.ViewModels
         private ObservableCollection<WaittingRoomUser> _roomUsers;
         private string _chatInput = "";
         private bool _isReady;
+        private string _statusMessage = "";
 
         public RoomInfo CurrentRoom
         {
@@ -46,6 +48,12 @@ namespace ChatClientWPF.ViewModels
             set => SetProperty(ref _isReady, value);
         }
 
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            set => SetProperty(ref _statusMessage, value);
+        }
+
         public ICommand LeaveRoomCommand { get; }
         public ICommand SendChatCommand { get; }
         public ICommand ReadyCommand { get; }
@@ -62,113 +70,117 @@ namespace ChatClientWPF.ViewModels
             ReadyCommand = new RelayCommand(ExecuteReady);
             RefreshRoomInfoCommand = new RelayCommand(ExecuteRefreshRoomInfo);
 
-            _mainViewModel.ChatModel.OnRoomInfoChanged += OnRoomInfoChanged;
-            _mainViewModel.ChatModel.OnChatMessageReceived += OnChatMessageReceived;
-            _mainViewModel.ChatModel.OnRoomClosed += OnRoomClosed;
-            _mainViewModel.ChatModel.OnUserJoinedRoom += OnUserJoinedRoom;
-            _mainViewModel.ChatModel.OnUserLeftRoom += OnUserLeftRoom;
-            _mainViewModel.ChatModel.OnRoomInfoRefreshed += OnRoomInfoRefreshed;
-            _mainViewModel.ChatModel.OnRoomJoined += OnRoomJoined;
+            // RoomManager 이벤트 구독
+            var roomManager = RoomManager.Instance;
+            roomManager.OnWaittingRoomInfoChanged += OnWaittingRoomInfoChanged;
+            roomManager.OnRoomLeft += OnRoomLeft;
+            roomManager.OnGameStarting += OnGameStarting;
+            roomManager.OnStatusMessage += (msg) => StatusMessage = msg;
+            roomManager.OnError += (err) => StatusMessage = "ERROR: " + err;
 
-            // 방 정보 자동 새로고침
-            _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
+            // Logger 구독
+            Logger.OnLog += (msg) => StatusMessage = msg;
+            Logger.OnLogError += (err) => StatusMessage = "ERROR: " + err;
+
+            // 현재 방 정보 가져오기
+            var currentRoomInfo = roomManager.CachedCurrRoom;
+            if (currentRoomInfo.Item1.RoomId != null)
+            {
+                CurrentRoom = currentRoomInfo.Item1;
+                UpdateRoomUsers(currentRoomInfo.Item2);
+            }
+
+            StatusMessage = "대기실에 입장했습니다";
         }
 
-        private void ExecuteLeaveRoom(object? obj)
+        private async void ExecuteLeaveRoom(object? obj)
         {
-            _mainViewModel.ChatModel.LeaveRoomAsync();
+            StatusMessage = "방 나가는 중...";
+            await RoomManager.Instance.RequestLeaveRoomAsync();
             _mainViewModel.NavigateToLobby();
         }
 
-        private void ExecuteSendChat(object? obj)
+        private async void ExecuteSendChat(object? obj)
         {
             if (string.IsNullOrWhiteSpace(ChatInput)) return;
-            _mainViewModel.ChatModel.SendChatMessageAsync(ChatInput, 1, 0); // 1 for InGame/Room chat?
+
+            // 채팅은 나중에 구현 (GamePlayManager 필요)
+            ChatMessages.Add(new ChatMessage
+            {
+                SenderId = "ME",
+                Message = ChatInput
+            });
+
+            StatusMessage = $"채팅 전송: {ChatInput}";
             ChatInput = "";
         }
 
-        private void ExecuteReady(object? obj)
+        private async void ExecuteReady(object? obj)
         {
-            _mainViewModel.ChatModel.ToggleReadyAsync();
+            bool newReadyState = !IsReady;
+            StatusMessage = newReadyState ? "준비 중..." : "준비 취소 중...";
+
+            bool success = await RoomManager.Instance.RequestReadyAsync(newReadyState);
+            if (success)
+            {
+                IsReady = newReadyState;
+                StatusMessage = newReadyState ? "준비 완료!" : "준비 취소됨";
+            }
         }
 
-        private void ExecuteRefreshRoomInfo(object? obj)
+        private async void ExecuteRefreshRoomInfo(object? obj)
         {
-            _mainViewModel.ChatModel.RefreshRoomInfoAsync();
+            StatusMessage = "방 정보 새로고침 중...";
+            await RoomManager.Instance.RequestJoinedRoomInfoRefresh();
         }
 
-        private void OnRoomJoined(RoomInfo roomInfo, int chatChannelId)
+        private void OnWaittingRoomInfoChanged(RoomInfo roomInfo, WaittingRoomUser[] users)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
                 CurrentRoom = roomInfo;
-                // 방 입장 후 정보 새로고침
-                _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
+                UpdateRoomUsers(users);
+                StatusMessage = $"방 정보 업데이트: {roomInfo.PlayerCount}/{roomInfo.MaxPlayers}명";
             });
         }
 
-        private void OnRoomInfoChanged(RoomInfo roomInfo)
+        private void UpdateRoomUsers(WaittingRoomUser[] users)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            RoomUsers.Clear();
+            foreach (var user in users)
             {
-                CurrentRoom = roomInfo;
-            });
-        }
+                RoomUsers.Add(user);
+            }
 
-        private void OnRoomInfoRefreshed(RoomInfo roomInfo, WaittingRoomUser[] users)
-        {
-            Application.Current.Dispatcher.Invoke(() =>
+            // 내 Ready 상태 업데이트
+            // Note: users 배열에서 첫 번째 유저가 본인이라고 가정 (서버 구현 확인 필요)
+            if (users.Length > 0)
             {
-                CurrentRoom = roomInfo;
-                RoomUsers.Clear();
+                // 모든 사용자 중에서 Ready 상태를 확인
                 foreach (var user in users)
                 {
-                    RoomUsers.Add(user);
+                    // IsReady 상태는 서버에서 브로드캐스트로 받을 것이므로 여기서는 일단 스킵
+                    // 실제 IsReady는 ROOM_INFO_CHANGED 이벤트에서 업데이트됨
                 }
-
-                // 내 Ready 상태 업데이트
-                var myUser = users.FirstOrDefault(u => u.userInfo.UserName == _mainViewModel.ChatModel.UserName);
-                if (myUser.userInfo.UserName != null)
-                {
-                    IsReady = myUser.IsReady;
-                }
-            });
+            }
         }
 
-        private void OnChatMessageReceived(ChatMessage message)
+        private void OnRoomLeft()
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                ChatMessages.Add(message);
-            });
-        }
-
-        private void OnRoomClosed(string roomId, string reason)
-        {
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                MessageBox.Show($"방이 닫혔습니다: {reason}");
+                StatusMessage = "방에서 나갔습니다";
                 _mainViewModel.NavigateToLobby();
             });
         }
 
-        private void OnUserJoinedRoom(int userId, string userName, int playerCount)
+        private void OnGameStarting()
         {
-             Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.Invoke(() =>
             {
-                ChatMessages.Add(new ChatMessage { SenderId = "SYSTEM", Message = $"{userName} 님이 입장하셨습니다." });
-                // 방 정보 새로고침
-                _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
-            });
-        }
-
-        private void OnUserLeftRoom(int userId, int playerCount)
-        {
-             Application.Current.Dispatcher.Invoke(() =>
-            {
-                ChatMessages.Add(new ChatMessage { SenderId = "SYSTEM", Message = $"플레이어 {userId} 님이 퇴장하셨습니다." });
-                // 방 정보 새로고침
-                _ = _mainViewModel.ChatModel.RefreshRoomInfoAsync();
+                StatusMessage = "게임이 시작됩니다!";
+                MessageBox.Show("게임이 곧 시작됩니다!", "게임 시작");
+                _mainViewModel.NavigateToGame();
             });
         }
     }

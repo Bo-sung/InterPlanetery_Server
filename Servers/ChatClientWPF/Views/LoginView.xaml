@@ -30,8 +30,11 @@
 
                 <Button Content="로그인" Command="{Binding LoginCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,10"/>
                 <Button Content="회원가입" Command="{Binding RegisterCommand}" Style="{StaticResource SecondaryButtonStyle}"/>
-                
-                <ProgressBar IsIndeterminate="True" Height="2" Margin="0,20,0,0" 
+
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource AccentBrush}"
+                           HorizontalAlignment="Center" Margin="0,15,0,0" FontSize="12"/>
+
+                <ProgressBar IsIndeterminate="True" Height="2" Margin="0,10,0,0"
                              Visibility="{Binding IsConnecting, Converter={StaticResource BoolToVisibilityConverter}}"/>
             </StackPanel>
         </Border>

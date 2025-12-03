@@ -20,6 +20,7 @@
     <SolidColorBrush x:Key="DangerHoverBrush" Color="#FFF75C4C"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="#FF3D5A80"/>
     <SolidColorBrush x:Key="SecondaryHoverBrush" Color="#FF4D6A90"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#FF4A90E2"/>
 
     <!-- Page Background -->
     <Style x:Key="PageStyle" TargetType="Page">
