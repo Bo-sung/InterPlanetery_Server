@@ -30,14 +30,19 @@ namespace BaseServer.Core.Game.Entities
 
         public class FleetInfo
         {
+            public long fleetId;        // 함대 고유 ID (추적용)
+            public int fleetType;       // 함대 타입 (시각화용)
+            public int ownerId;         // 소유자 ID
             public CommonLib.Vector2 position;
             public int state = 0;   // 0 = Idle, 1 = battle. 2 = move
             public float HP = 0;
+            public float maxHP = 0;     // 최대 HP (HP바 표시용)
             public CommonLib.Vector2 target;    // idle일때는 무시
         }
 
         public class Planet
         {
+            public int planetId;        // 행성 ID (추적용)
             public int owner = -1;
             public float conquestProgress = 0;
         }
@@ -49,10 +54,13 @@ namespace BaseServer.Core.Game.Entities
 
         public GameState(GameMap gameMap, GamePlayer[] playerarr, Dictionary<long, Fleet> fleets, int curr_state)
         {
+            // Planet 정보 (동적 데이터만: planetId, owner, conquestProgress)
             List<Planet> planetList = new List<Planet>();
-            foreach (var item in gameMap.Planets)
+            for (int i = 0; i < gameMap.Planets.Length; i++)
             {
+                var item = gameMap.Planets[i];
                 Planet p = new Planet();
+                p.planetId = i;  // 행성 인덱스를 ID로 사용
                 p.owner = item.OwnerId;
                 p.conquestProgress = item.ConquestProgress;
                 planetList.Add(p);
@@ -60,11 +68,15 @@ namespace BaseServer.Core.Game.Entities
 
             planets = planetList.ToArray();
 
+            // Player 정보 (자원 + 함대)
             List<Player> playerList = new List<Player>();
             foreach (var item in playerarr)
             {
                 Player p = new Player();
                 p.id = item.ID;
+                p.Gas = item.Gas;
+                p.Mineral = item.Mineral;
+                p.Supply = item.Supply;
 
                 List<FleetInfo> fleetList = new List<FleetInfo>();
 
@@ -72,16 +84,17 @@ namespace BaseServer.Core.Game.Entities
                 foreach (var fitem in fleets.Values.ToList().FindAll(x => x.Owner == p.id))
                 {
                     FleetInfo fleet = new FleetInfo();
+                    fleet.fleetId = fitem.ID;           // 고유 ID
+                    fleet.fleetType = fitem.FleetType;  // 함대 타입 (Fleet에 FleetType 프로퍼티 필요)
+                    fleet.ownerId = fitem.Owner;        // 소유자 ID
+                    fleet.position = fitem.Position;
                     fleet.state = (int)fitem.State;
                     fleet.HP = fitem.CurHealth;
-                    fleet.position = fitem.Position;
+                    fleet.maxHP = fitem.MaxHealth;      // 최대 HP (Fleet에 MaxHealth 프로퍼티 필요)
                     fleet.target = fitem.MoveTarget;
                     fleetList.Add(fleet);
                 }
                 p.fleets = fleetList.ToArray();
-                p.Gas = item.Gas;
-                p.Mineral = item.Mineral;
-                p.Supply = item.Supply;
                 playerList.Add(p);
             }
             players = playerList.ToArray();

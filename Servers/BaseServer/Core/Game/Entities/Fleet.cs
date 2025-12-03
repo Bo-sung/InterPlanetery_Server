@@ -33,6 +33,8 @@ namespace BaseServer.Core.Game.Entities
         public Vector2 Position => _position;
 
         public string Name => _data.Name;
+        public int FleetType => _data.Type;         // 함대 타입 (GameState 전송용)
+        public float MaxHealth => _data.MaxHealth;   // 최대 HP (GameState 전송용)
         public float MoveSpeed => _data.MoveSpeed;
         public float AttackPower => _data.AttackPower;
 

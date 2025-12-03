@@ -341,7 +341,7 @@ namespace BaseServer.Core.Game.Entities
                 LogWithTimestamp($"[Room {RoomId}] Player {playerId} ({playerName}) left. ({PlayerCount}/{MaxPlayers})");
 
                 // 다른 플레이어에게 퇴장 알림
-                BroadcastUserLeft(playerId);
+                BroadcastUserLeft(playerId, playerName);
 
                 return true;
             }
@@ -460,10 +460,11 @@ namespace BaseServer.Core.Game.Entities
             Broadcast(protocol);
         }
 
-        private void BroadcastUserLeft(int userId)
+        private void BroadcastUserLeft(int userId, string userName)
         {
             Protocol protocol = new Protocol(ProtocolType.USER_LEFT)
                 .AddParam("userId", userId)
+                .AddParam("userName", userName)
                 .AddParam("playerCount", PlayerCount);
 
             Broadcast(protocol);
