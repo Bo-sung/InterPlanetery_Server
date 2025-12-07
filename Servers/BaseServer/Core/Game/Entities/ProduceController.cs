@@ -8,11 +8,11 @@ namespace BaseServer.Core.Game.Entities
     {
         public int PlayerId { get; set; }
         public Fleet Fleet { get; set; }
-        public DateTime StartTime { get; set; }
-        public float ProductionTime { get; set; }  // 총 생산 시간 (초)
-        public float RemainingTime { get; set; }   // 남은 생산 시간 (초)
+        public long StartTick { get; set; }        // 생산 시작 틱
+        public int ProductionTime { get; set; }    // 총 생산 시간 (틱)
+        public int RemainingTicks { get; set; }    // 남은 생산 시간 (틱)
 
-        public float Progress => 1f - (RemainingTime / ProductionTime);
+        public float Progress => 1f - ((float)RemainingTicks / ProductionTime);
     }
 
     public class ProduceController
@@ -41,7 +41,7 @@ namespace BaseServer.Core.Game.Entities
         }
 
         // 생산 요청 처리
-        public void RequestProcess(int fleetType, int playerId, long nextFleetId)
+        public void RequestProcess(int fleetType, int playerId, long nextFleetId, long currentTick)
         {
             var data = GetProductionInfoDataFromDB(fleetType);
             if (data == null)
@@ -49,12 +49,12 @@ namespace BaseServer.Core.Game.Entities
                 LogWithTimestamp($"ProductionInfoData not found: {fleetType}");
                 return;
             }
-            
-            RequestProcess(data, playerId, nextFleetId);
+
+            RequestProcess(data, playerId, nextFleetId, currentTick);
         }
 
         // 생산 요청 처리
-        public void RequestProcess(ProductionInfoData productionData, int playerId, long nextFleetId)
+        public void RequestProcess(ProductionInfoData productionData, int playerId, long nextFleetId, long currentTick)
         {
             // 플레이어의 생산 큐가 없으면 생성
             if (!productionQueue.ContainsKey(playerId))
@@ -73,18 +73,18 @@ namespace BaseServer.Core.Game.Entities
             {
                 PlayerId = playerId,
                 Fleet = new Fleet(fleetData, playerId, nextFleetId),
-                StartTime = DateTime.Now,
+                StartTick = currentTick,
                 ProductionTime = productionData.ProductionTime,
-                RemainingTime = productionData.ProductionTime
+                RemainingTicks = productionData.ProductionTime
             };
 
             productionQueue[playerId].Add(production);
             productions.Add(nextFleetId);
-            LogWithTimestamp($"Player {playerId} started producing fleet {production.Fleet.ID}");
+            LogWithTimestamp($"Player {playerId} started producing fleet {production.Fleet.ID} (will take {productionData.ProductionTime} ticks)");
         }
 
         // 매 틱마다 호출되어 생산 상태 업데이트
-        public void ProcessUpdate(float deltaTime)
+        public void ProcessUpdate()
         {
             foreach (var kvp in productionQueue)
             {
@@ -94,13 +94,13 @@ namespace BaseServer.Core.Game.Entities
                 // 완료된 생산 목록
                 List<ProductionInfo> completedProductions = new List<ProductionInfo>();
 
-                // 각 생산 항목의 남은 시간 감소
+                // 각 생산 항목의 남은 틱 감소
                 foreach (var production in productions)
                 {
-                    production.RemainingTime -= deltaTime;
+                    production.RemainingTicks--;
 
                     // 생산 완료 체크
-                    if (production.RemainingTime <= 0)
+                    if (production.RemainingTicks <= 0)
                     {
                         completedProductions.Add(production);
                     }

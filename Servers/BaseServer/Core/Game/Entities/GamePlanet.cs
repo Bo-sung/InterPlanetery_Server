@@ -52,6 +52,9 @@ namespace BaseServer.Core.Game.Entities
             else
             {
                 ConquestProgress--;
+                // 음수 방지
+                if (ConquestProgress < 0)
+                    ConquestProgress = 0;
             }
         }
 

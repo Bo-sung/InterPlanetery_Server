@@ -39,7 +39,7 @@ namespace BaseServer.Core.Game.Entities
         public float AttackPower => _data.AttackPower;
 
         // 이동 타겟. 이동중이면 목적지. 공격중이면 공격 타겟 포지션. 없으면 현재 위치 전달
-        public Vector2 MoveTarget => State == FleetState.Moving ? _moveTo : State == FleetState.Attacking ?  _Enemy.Position : Position;
+        public Vector2 MoveTarget => State == FleetState.Moving ? _moveTo : State == FleetState.Attacking && _Enemy != null && _Enemy.State != FleetState.Removed ? _Enemy.Position : Position;
 
         public Fleet? Enemy => _Enemy;
 
@@ -79,7 +79,7 @@ namespace BaseServer.Core.Game.Entities
             if(attacker == null)
                 return;
 
-            _curHealth += attacker.AttackPower;
+            _curHealth -= attacker.AttackPower;
 
             // 체력 음수 방지
             _curHealth = MathF.Max(0, _curHealth);
@@ -111,6 +111,13 @@ namespace BaseServer.Core.Game.Entities
                 return;
             if (_Enemy == null)
                 return;
+            // Enemy가 Removed 상태면 공격 중지
+            if (_Enemy.State == FleetState.Removed)
+            {
+                _Enemy = null;
+                _state = FleetState.Idle;
+                return;
+            }
 
             // 첫 시작인 경우
             if (_lastAttackTick == 0)

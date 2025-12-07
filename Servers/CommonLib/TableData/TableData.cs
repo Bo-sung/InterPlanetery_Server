@@ -71,7 +71,7 @@ namespace CommonLib.TableData
     public record ProductionInfoData(
          [DbColumn("id")] int id,
          [DbColumn("target_id")] int Targetid,
-         [DbColumn("production_time")] float ProductionTime,
+         [DbColumn("production_time")] int ProductionTime,
          [DbColumn("gas_cost")] int GasCost,
          [DbColumn("mineral_cost")] int MineralCost,
          [DbColumn("supply_cost")] int SupplyCost
@@ -99,7 +99,7 @@ namespace CommonLib.TableData
                     continue;
                 if (!int.TryParse(reader[colNames[1]].ToString(), out int targetId))
                     continue;
-                if (!float.TryParse(reader[colNames[2]].ToString(), out float productionTime))
+                if (!int.TryParse(reader[colNames[2]].ToString(), out int productionTime))
                     continue;
                 if (!int.TryParse(reader[colNames[3]].ToString(), out int gasCost))
                     continue;

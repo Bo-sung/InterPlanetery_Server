@@ -74,8 +74,18 @@ namespace BaseServer.Core.Game.Entities
             _players = playerIDs;
 
             _homePlanet.Clear();
-            _homePlanet.Add(_players[0], _staticMapData.mapInfoData.Player1_HomeID);
-            _homePlanet.Add(_players[1], _staticMapData.mapInfoData.Player2_HomeID);
+
+            // Player 1 홈 행성 설정 (유효한 경우에만)
+            if (_players.Length > 0 && _players[0] != -1)
+            {
+                _homePlanet.Add(_players[0], _staticMapData.mapInfoData.Player1_HomeID);
+            }
+
+            // Player 2 홈 행성 설정 (유효한 경우에만)
+            if (_players.Length > 1 && _players[1] != -1)
+            {
+                _homePlanet.Add(_players[1], _staticMapData.mapInfoData.Player2_HomeID);
+            }
         }
 
         public GamePlanet? GetPlanet(int planetId)
