@@ -922,6 +922,27 @@ namespace BaseServer.Core.Game.Entities
                 LogWithTimestamp($"[Game] Invalid production target ID: {targetId}");
                 return;
             }
+
+            GamePlayer player = GetPlayer(playerId);
+            if (player == null)
+            {
+                LogWithTimestamp($"[Game] Invalid playerId: {playerId}");
+                return;
+            }
+
+            if(player.Gas < produceFleetData.GasCost ||
+                player.Mineral < produceFleetData.MineralCost ||
+                player.Supply < produceFleetData.SupplyCost)
+            {
+
+                LogWithTimestamp($"[Game] Low Resouces : {0}");
+                return;
+            }
+
+            player.Gas -= produceFleetData.GasCost;
+            player.Mineral -= produceFleetData.MineralCost;
+            player.Supply += produceFleetData.SupplyCost;
+
             // 캐시된 다음 ID 사용 (O(1) 시간복잡도)
             long id = m_CASHED_NEXTFLEET_ID++;
 

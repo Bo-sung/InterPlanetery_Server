@@ -138,12 +138,6 @@ namespace BaseServer.Core.Game.Entities
             }
             GameCommandType commandType = (GameCommandType)commandTypeVal;
 
-            var commandDataVal = _protocol.GetParam<string>("commandData");
-            if (commandDataVal == null)
-            {
-                return;
-            }
-
             Command command;
             switch (commandType)
             {
