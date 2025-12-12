@@ -75,6 +75,7 @@ namespace BaseServer.Core.Game.Entities
         public Queue<int> ProductionOrder { get { return m_productionOrder; } }
 
         public System.Action OnUserReady;
+        public System.Action OnClientReady;
         #endregion
 
         public GamePlayer()
@@ -113,6 +114,7 @@ namespace BaseServer.Core.Game.Entities
             if (clientSession == null)
                 return;
             clientSession.RegisterProto(ProtocolType.SUBMIT_COMMAND, HandleSubmitCommand);
+            clientSession.RegisterProto(ProtocolType.REQUEST_GAME_CL_READY, HandleClientReady);
         }
 
         protected virtual void UnRegistorProtos()
@@ -120,6 +122,7 @@ namespace BaseServer.Core.Game.Entities
             if (clientSession == null)
                 return;
             clientSession.UnRegisterProto(ProtocolType.SUBMIT_COMMAND);
+            clientSession.UnRegisterProto(ProtocolType.REQUEST_GAME_CL_READY);
         }
 
         /// <summary>
@@ -163,6 +166,11 @@ namespace BaseServer.Core.Game.Entities
         public async Task HandleUserReady(Protocol _protocol)
         {
             OnUserReady?.Invoke();
+        }
+
+        public async Task HandleClientReady(Protocol _protocol)
+        {
+            OnClientReady?.Invoke();
         }
 
         public async Task Async_SendGameSet(MapData map)

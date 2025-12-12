@@ -26,6 +26,17 @@ namespace BaseServer.Core.Game.Entities
             public int Gas;
             public int Mineral;
             public int Supply;
+            public ProductionQueueInfo[] productionQueue;  // 생산 대기열
+        }
+
+        public class ProductionQueueInfo
+        {
+            public long fleetId;           // 생산 중인 함대 ID
+            public int fleetType;          // 함대 타입 (production_info.target_id)
+            public int ownerId;            // 소유자 ID (UI 구분용)
+            public int remainingTicks;     // 남은 생산 시간 (틱)
+            public int totalTicks;         // 총 생산 시간 (틱)
+            public float progress;         // 진행도 (0.0 ~ 1.0)
         }
 
         public class FleetInfo
@@ -48,11 +59,12 @@ namespace BaseServer.Core.Game.Entities
         }
 
         public int state = 0; // 0 = 준비. 1 = 진행중, 2 = 종료
+        public long tick = 0;
 
         public Player[] players;
         public Planet[] planets;
 
-        public GameState(GameMap gameMap, GamePlayer[] playerarr, Dictionary<long, Fleet> fleets, int curr_state)
+        public GameState(GameMap gameMap, GamePlayer[] playerarr, Dictionary<long, Fleet> fleets, int curr_state, long tick, ProduceController produceController)
         {
             // Planet 정보 (동적 데이터만: planetId, owner, conquestProgress)
             List<Planet> planetList = new List<Planet>();
@@ -95,10 +107,31 @@ namespace BaseServer.Core.Game.Entities
                     fleetList.Add(fleet);
                 }
                 p.fleets = fleetList.ToArray();
+
+                // 생산 대기열 정보 추가
+                List<ProductionQueueInfo> productionList = new List<ProductionQueueInfo>();
+                if (produceController != null)
+                {
+                    var playerProductions = produceController.GetPlayerProductions(p.id);
+                    foreach (var production in playerProductions)
+                    {
+                        ProductionQueueInfo prodInfo = new ProductionQueueInfo();
+                        prodInfo.fleetId = production.Fleet.ID;
+                        prodInfo.fleetType = production.Fleet.FleetType;
+                        prodInfo.ownerId = production.PlayerId;
+                        prodInfo.remainingTicks = production.RemainingTicks;
+                        prodInfo.totalTicks = production.ProductionTime;
+                        prodInfo.progress = production.Progress;
+                        productionList.Add(prodInfo);
+                    }
+                }
+                p.productionQueue = productionList.ToArray();
+
                 playerList.Add(p);
             }
             players = playerList.ToArray();
             state = curr_state;
+            this.tick = tick;
         }
     }
 
@@ -571,7 +604,7 @@ namespace BaseServer.Core.Game.Entities
             foreach (var player in m_players)
             {
                 if (player != null)
-                    player.OnUserReady += handler;
+                    player.OnClientReady += handler;
             }
 
             // 타임아웃 처리
@@ -1224,7 +1257,7 @@ namespace BaseServer.Core.Game.Entities
             GameState state;
             lock (m_fleetsLock)
             {
-                state = new GameState(m_gameMap, m_players, m_dic_fleets, m_gameState);
+                state = new GameState(m_gameMap, m_players, m_dic_fleets, m_gameState, currentTick, m_produceController);
             }
             foreach (var player in m_players)
             {
