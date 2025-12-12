@@ -153,6 +153,7 @@ namespace BaseServer.Core.Game.Entities
 
             if (commandSender != null)
             {
+                command.PlayerId = this.m_id;
                 await commandSender.SendCommandToGame(command);
             }
         }
