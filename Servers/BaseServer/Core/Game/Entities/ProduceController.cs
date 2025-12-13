@@ -72,7 +72,7 @@ namespace BaseServer.Core.Game.Entities
             ProductionInfo production = new ProductionInfo
             {
                 PlayerId = playerId,
-                Fleet = new Fleet(fleetData, playerId, nextFleetId),
+                Fleet = new Fleet(fleetData, playerId, nextFleetId, productionData.SupplyCost),
                 StartTick = currentTick,
                 ProductionTime = productionData.ProductionTime,
                 RemainingTicks = productionData.ProductionTime

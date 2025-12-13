@@ -12,6 +12,7 @@ namespace BaseServer.Core.Game.Entities
         private FleetInfoData _data;
         private FleetState _state;
         private Vector2 _position;
+        private int _supplyCost;
 
         // 이동 처리용
         private Vector2 _moveFrom = new Vector2(0,0);
@@ -37,13 +38,14 @@ namespace BaseServer.Core.Game.Entities
         public float MaxHealth => _data.MaxHealth;   // 최대 HP (GameState 전송용)
         public float MoveSpeed => _data.MoveSpeed;
         public float AttackPower => _data.AttackPower;
+        public int SupplyCost => _supplyCost;
 
         // 이동 타겟. 이동중이면 목적지. 공격중이면 공격 타겟 포지션. 없으면 현재 위치 전달
         public Vector2 MoveTarget => State == FleetState.Moving ? _moveTo : State == FleetState.Attacking && _Enemy != null && _Enemy.State != FleetState.Removed ? _Enemy.Position : Position;
 
         public Fleet? Enemy => _Enemy;
 
-        public Fleet(FleetInfoData data, int ownerId, long instanceId)
+        public Fleet(FleetInfoData data, int ownerId, long instanceId, int supplyCost)
         {
             this._data = data;
             this._ownerId = ownerId;
@@ -51,17 +53,19 @@ namespace BaseServer.Core.Game.Entities
             this._curHealth = data.MaxHealth; // 최대 체력으로 초기화
             this._position = new Vector2(0,0);
             this._instanceId = instanceId;
+            this._supplyCost = supplyCost;
         }
 
-        public Fleet(FleetInfoData data, int ownerId, Vector2 position, long instanceId)
-        {
-            this._data = data;
-            this._ownerId = ownerId;
-            this._state = FleetState.Idle;
-            this._curHealth = data.MaxHealth; // 최대 체력으로 초기화
-            this._position = position;
-            this._instanceId = instanceId;
-        }
+        // public Fleet(FleetInfoData data, int ownerId, Vector2 position, long instanceId, int supplyCost)
+        // {
+        //     this._data = data;
+        //     this._ownerId = ownerId;
+        //     this._state = FleetState.Idle;
+        //     this._curHealth = data.MaxHealth; // 최대 체력으로 초기화
+        //     this._position = position;
+        //     this._instanceId = instanceId;
+        //     this._supplyCost = supplyCost;
+        // }
 
         public bool IsAttackRange(Fleet target)
         {

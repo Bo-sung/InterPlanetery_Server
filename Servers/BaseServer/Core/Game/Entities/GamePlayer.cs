@@ -37,10 +37,11 @@ namespace BaseServer.Core.Game.Entities
         private int m_gas = 0;
         private int m_mineral = 0;
         private int m_supply = 0;
+        private int m_maxSup = 0;
         #endregion
 
         #region 게임 오브젝트 필드
-        private List<int> m_fleets = new List<int>();
+        private List<long> m_fleets = new List<long>();
         private List<int> m_planets = new List<int>();
         private Queue<int> m_productionOrder = new Queue<int>();
         private int m_faction = 0; // 진영 정보
@@ -65,12 +66,13 @@ namespace BaseServer.Core.Game.Entities
         public int Gas { get { return m_gas; } set { m_gas = value; } }
         public int Mineral { get { return m_mineral; } set { m_mineral = value; } }
         public int Supply { get { return m_supply; } set { m_supply = value; } }
+        public int MaxSupply { get { return m_maxSup; } set { m_maxSup = value; } }
 
         public int Faction { get { return m_faction; } set { m_faction = value; } }
         public int Homeworld { get { return m_homeworld; } set { m_homeworld = value; } }
         public bool IsDefeated { get { return m_isDefeated; } set { m_isDefeated = value; } }
 
-        public List<int> Fleets { get { return m_fleets; } }
+        public List<long> Fleets { get { return m_fleets; } }
         public List<int> Planets { get { return m_planets; } }
         public Queue<int> ProductionOrder { get { return m_productionOrder; } }
 
@@ -213,7 +215,7 @@ namespace BaseServer.Core.Game.Entities
             // 점령한 행성들의 자원 총합
             int tickGas = 0;
             int tickMin = 0;
-            int tickSup = 0;
+            int maxsup = 0;
 
             foreach(var pindex in Planets)
             {
@@ -222,12 +224,12 @@ namespace BaseServer.Core.Game.Entities
                     continue;
                 tickGas += planet.Gas;
                 tickMin += planet.Mineral;
-                tickSup += planet.Supply;
+                maxsup += planet.Supply;
             }
 
             Gas += tickGas;
             Mineral += tickMin;
-            Supply = tickSup;       // 인구수는 초당 생산이 아니라 케파임.
+            MaxSupply = maxsup;       // 인구수는 초당 생산이 아니라 케파임. 고르. 최대치만 설정
         }
         #endregion
 

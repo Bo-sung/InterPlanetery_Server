@@ -26,6 +26,7 @@ namespace BaseServer.Core.Game.Entities
             public int Gas;
             public int Mineral;
             public int Supply;
+            public int MaxSupply;
             public ProductionQueueInfo[] productionQueue;  // 생산 대기열
         }
 
@@ -89,6 +90,7 @@ namespace BaseServer.Core.Game.Entities
                 p.Gas = item.Gas;
                 p.Mineral = item.Mineral;
                 p.Supply = item.Supply;
+                p.MaxSupply = item.MaxSupply;
 
                 List<FleetInfo> fleetList = new List<FleetInfo>();
 
@@ -932,19 +934,19 @@ namespace BaseServer.Core.Game.Entities
 
             if(player.Gas < produceFleetData.GasCost ||
                 player.Mineral < produceFleetData.MineralCost ||
-                player.Supply < produceFleetData.SupplyCost)
+                player.MaxSupply - player.Supply < produceFleetData.SupplyCost)
             {
 
                 LogWithTimestamp($"[Game] Low Resouces : {0}");
                 return;
             }
 
+            // 캐시된 다음 ID 사용 (O(1) 시간복잡도)
+            long id = m_CASHED_NEXTFLEET_ID++;
+
             player.Gas -= produceFleetData.GasCost;
             player.Mineral -= produceFleetData.MineralCost;
             player.Supply += produceFleetData.SupplyCost;
-
-            // 캐시된 다음 ID 사용 (O(1) 시간복잡도)
-            long id = m_CASHED_NEXTFLEET_ID++;
 
             // 생산 컨트롤러에게 생산 요청
             LogWithTimestamp($"[Game] Produce fleet command: Player {playerId}, Fleet ID {id}, Target {targetId}");
@@ -1078,9 +1080,21 @@ namespace BaseServer.Core.Game.Entities
                 {
                     foreach (var fleetId in fleetsToRemove)
                     {
-                        if (m_dic_fleets.Remove(fleetId))
+                        m_dic_fleets.TryGetValue(fleetId, out var removedFleet);
+                        if (removedFleet != null)
                         {
-                            LogWithTimestamp($"[Game] Fleet {fleetId} removed from dictionary (destroyed)");
+                            // 소유자 플레이어의 함대 목록에서 제거
+                            var ownerPlayer = GetPlayer(removedFleet.Owner);
+                            if (ownerPlayer != null)
+                            {
+                                ownerPlayer.Fleets.Remove(fleetId);
+                                ownerPlayer.Supply -= removedFleet.SupplyCost;
+                            }
+
+                            if (m_dic_fleets.Remove(fleetId))
+                            {
+                                LogWithTimestamp($"[Game] Fleet {fleetId} removed from dictionary (destroyed)");
+                            }
                         }
                     }
                 }
