@@ -54,7 +54,7 @@ namespace BaseServer.Core.Game.Entities
         }
 
         // 생산 요청 처리
-        public void RequestProcess(ProductionInfoData productionData, int playerId, long nextFleetId, long currentTick)
+        public bool RequestProcess(ProductionInfoData productionData, int playerId, long nextFleetId, long currentTick)
         {
             // 플레이어의 생산 큐가 없으면 생성
             if (!productionQueue.ContainsKey(playerId))
@@ -66,7 +66,7 @@ namespace BaseServer.Core.Game.Entities
             if (fleetData == null)
             {
                 LogWithTimestamp($"FleetInfoData not found: {productionData.Targetid}");
-                return;
+                return false;
             }
 
             ProductionInfo production = new ProductionInfo
@@ -81,6 +81,7 @@ namespace BaseServer.Core.Game.Entities
             productionQueue[playerId].Add(production);
             productions.Add(nextFleetId);
             LogWithTimestamp($"Player {playerId} started producing fleet {production.Fleet.ID} (will take {productionData.ProductionTime} ticks)");
+            return true;
         }
 
         // 매 틱마다 호출되어 생산 상태 업데이트

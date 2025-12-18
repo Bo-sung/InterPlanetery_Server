@@ -950,10 +950,16 @@ namespace BaseServer.Core.Game.Entities
 
             // 생산 컨트롤러에게 생산 요청
             LogWithTimestamp($"[Game] Produce fleet command: Player {playerId}, Fleet ID {id}, Target {targetId}");
-            m_produceController.RequestProcess(produceFleetData, playerId, id, currentTick);
+            if(!m_produceController.RequestProcess(produceFleetData, playerId, id, currentTick))
+            {
+                // 생산 실패 시 자원 환불
+                player.Gas += produceFleetData.GasCost;
+                player.Mineral += produceFleetData.MineralCost;
+                player.Supply -= produceFleetData.SupplyCost;
+            }
         }
 
-        /// <summary>
+         /// <summary>
         /// 자원 생산 처리
         /// - 각 플레이어의 행성에서 자원 생산
         /// - 4틱마다 호출됨 (200ms 주기)
