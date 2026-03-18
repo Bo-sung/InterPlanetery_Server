@@ -1,4 +1,5 @@
-﻿using CommonLib;
+﻿using BaseServer.Utils;
+using CommonLib;
 using CommonLib.TableData; // MapData, Planet
 
 namespace BaseServer.Core.Game.Entities
@@ -72,9 +73,15 @@ namespace BaseServer.Core.Game.Entities
             return Vector2.Distance(this._position, target._position) < ATTACK_RANGE;
         }
 
-        public void SetAttackTarget(Fleet target)
+        public bool SetAttackTarget(Fleet target)
         {
+            if (target == null || target.State == FleetState.Removed)
+                return false;
+            if (_state == FleetState.Removed)
+                return false;
+
             _Enemy = target;
+            return true;
         }
 
 
@@ -101,12 +108,18 @@ namespace BaseServer.Core.Game.Entities
             target.TakeDamage(this);
         }
 
-        public void Navigate(GamePlanet target, long currentTick)
+        public bool Navigate(GamePlanet target, long currentTick)
         {
+            if (target == null)
+                return false;
+            if (_state == FleetState.Removed)
+                return false;
+
             _state = FleetState.Moving;
             _moveTo = target.Position;
             _moveFrom = Position;
             _moveStartTime = currentTick;
+            return true;
         }
 
         public void UpdateAttack(long currentTick)
@@ -165,26 +178,21 @@ namespace BaseServer.Core.Game.Entities
             var beforePos = _position;
             _position = Vector2.Lerp(_moveFrom, _moveTo, progress);
 
-            LogWithTimestamp($"[GAME] FleetMoved. ID : {ID}, before :{beforePos} After : {_position}");
+            Logger.Log($"[GAME] FleetMoved. ID : {ID}, before :{beforePos} After : {_position}");
         }
         public void PrintInfo()
         {
-            LogWithTimestamp($"=== Fleet {this.ID} Info ===");
-            LogWithTimestamp($"Name: {this.Name}");
-            LogWithTimestamp($"Type: {this._data.Type}");
-            LogWithTimestamp($"Health: {this.CurHealth}/{this._data.MaxHealth}");
-            LogWithTimestamp($"Attack Power: {this.AttackPower}");
-            LogWithTimestamp($"Move Speed: {this.MoveSpeed}");
-            LogWithTimestamp($"State: {this.State}");
-            LogWithTimestamp($"Owner ID: {this.Owner}");
-            LogWithTimestamp($"Position: {this.Position}");
-            LogWithTimestamp($"========================");
+            Logger.Log($"=== Fleet {this.ID} Info ===");
+            Logger.Log($"Name: {this.Name}");
+            Logger.Log($"Type: {this._data.Type}");
+            Logger.Log($"Health: {this.CurHealth}/{this._data.MaxHealth}");
+            Logger.Log($"Attack Power: {this.AttackPower}");
+            Logger.Log($"Move Speed: {this.MoveSpeed}");
+            Logger.Log($"State: {this.State}");
+            Logger.Log($"Owner ID: {this.Owner}");
+            Logger.Log($"Position: {this.Position}");
+            Logger.Log($"========================");
         }
 
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
     }
 }

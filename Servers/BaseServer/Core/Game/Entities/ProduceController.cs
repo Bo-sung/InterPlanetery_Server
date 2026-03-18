@@ -1,4 +1,5 @@
 ﻿using BaseServer.Database;
+using BaseServer.Utils;
 using CommonLib.TableData; // MapData, Planet
 
 namespace BaseServer.Core.Game.Entities
@@ -20,6 +21,7 @@ namespace BaseServer.Core.Game.Entities
         // 생산 중인 함대 정보 (PlayerId -> 생산 중인 Fleet 리스트)
         private Dictionary<int, List<ProductionInfo>> productionQueue = new Dictionary<int, List<ProductionInfo>>();
         private List<long> productions = new List<long>();
+        private readonly object _lock = new object();
         private DB_Table _db;
 
         public System.Action<Fleet> OnProductionFinish;
@@ -29,15 +31,12 @@ namespace BaseServer.Core.Game.Entities
             this._db = db.Table;
         }
 
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
-
         public bool IsOnProduction(long id)
         {
-            return productions.Contains(id);
+            lock (_lock)
+            {
+                return productions.Contains(id);
+            }
         }
 
         // 생산 요청 처리
@@ -46,7 +45,7 @@ namespace BaseServer.Core.Game.Entities
             var data = GetProductionInfoDataFromDB(fleetType);
             if (data == null)
             {
-                LogWithTimestamp($"ProductionInfoData not found: {fleetType}");
+                Logger.Log($"ProductionInfoData not found: {fleetType}");
                 return;
             }
 
@@ -56,16 +55,11 @@ namespace BaseServer.Core.Game.Entities
         // 생산 요청 처리
         public bool RequestProcess(ProductionInfoData productionData, int playerId, long nextFleetId, long currentTick)
         {
-            // 플레이어의 생산 큐가 없으면 생성
-            if (!productionQueue.ContainsKey(playerId))
-            {
-                productionQueue[playerId] = new List<ProductionInfo>();
-            }
-
+            // DB 조회는 lock 바깥에서 수행 (느린 I/O를 lock 안에 넣지 않음)
             FleetInfoData fleetData = GetFleetDataFromDB(productionData.Targetid);
             if (fleetData == null)
             {
-                LogWithTimestamp($"FleetInfoData not found: {productionData.Targetid}");
+                Logger.Log($"FleetInfoData not found: {productionData.Targetid}");
                 return false;
             }
 
@@ -78,52 +72,63 @@ namespace BaseServer.Core.Game.Entities
                 RemainingTicks = productionData.ProductionTime
             };
 
-            productionQueue[playerId].Add(production);
-            productions.Add(nextFleetId);
-            LogWithTimestamp($"Player {playerId} started producing fleet {production.Fleet.ID} (will take {productionData.ProductionTime} ticks)");
+            lock (_lock)
+            {
+                if (!productionQueue.ContainsKey(playerId))
+                    productionQueue[playerId] = new List<ProductionInfo>();
+
+                productionQueue[playerId].Add(production);
+                productions.Add(nextFleetId);
+            }
+
+            Logger.Log($"Player {playerId} started producing fleet {production.Fleet.ID} (will take {productionData.ProductionTime} ticks)");
             return true;
         }
 
         // 매 틱마다 호출되어 생산 상태 업데이트
         public void ProcessUpdate()
         {
-            foreach (var kvp in productionQueue)
+            List<ProductionInfo> allCompleted = new List<ProductionInfo>();
+
+            lock (_lock)
             {
-                int playerId = kvp.Key;
-                List<ProductionInfo> productions = kvp.Value;
-
-                // 완료된 생산 목록
-                List<ProductionInfo> completedProductions = new List<ProductionInfo>();
-
-                // 각 생산 항목의 남은 틱 감소
-                foreach (var production in productions)
+                foreach (var kvp in productionQueue)
                 {
-                    production.RemainingTicks--;
+                    List<ProductionInfo> queue = kvp.Value;
+                    List<ProductionInfo> completedInQueue = new List<ProductionInfo>();
 
-                    // 생산 완료 체크
-                    if (production.RemainingTicks <= 0)
+                    foreach (var production in queue)
                     {
-                        completedProductions.Add(production);
-                    }
-                }
+                        production.RemainingTicks--;
 
-                // 완료된 생산 처리
-                foreach (var completed in completedProductions)
-                {
-                    HandleProduceComplete(completed);
-                    productions.Remove(completed);
+                        if (production.RemainingTicks <= 0)
+                            completedInQueue.Add(production);
+                    }
+
+                    foreach (var completed in completedInQueue)
+                        queue.Remove(completed);
+
+                    allCompleted.AddRange(completedInQueue);
                 }
             }
+
+            // 완료된 생산 처리는 lock 바깥에서 (콜백 호출 포함)
+            foreach (var completed in allCompleted)
+                HandleProduceComplete(completed);
         }
 
         // 생산 완료 처리
         private void HandleProduceComplete(ProductionInfo production)
         {
-            LogWithTimestamp($"Fleet {production.Fleet.ID} production completed for player {production.PlayerId}");
+            Logger.Log($"Fleet {production.Fleet.ID} production completed for player {production.PlayerId}");
+
+            lock (_lock)
+            {
+                productions.Remove(production.Fleet.ID);
+            }
 
             // FleetController로 완성된 Fleet 전달
             OnProductionFinish?.Invoke(production.Fleet);
-            productions.Remove(production.Fleet.ID);
             // DB에 생산 완료 기록 (필요시)
             SaveProductionToDB(production);
         }
@@ -155,9 +160,12 @@ namespace BaseServer.Core.Game.Entities
         // 플레이어의 현재 생산 목록 조회
         public List<ProductionInfo> GetPlayerProductions(int playerId)
         {
-            return productionQueue.TryGetValue(playerId, out var productions)
-                ? new List<ProductionInfo>(productions)
-                : new List<ProductionInfo>();
+            lock (_lock)
+            {
+                return productionQueue.TryGetValue(playerId, out var queue)
+                    ? new List<ProductionInfo>(queue)
+                    : new List<ProductionInfo>();
+            }
         }
     }
 }

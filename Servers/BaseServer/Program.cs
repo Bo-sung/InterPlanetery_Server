@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
 using BaseServer.Database;
+using BaseServer.Utils;
 using Microsoft.Extensions.Configuration;
 
 namespace BaseServer
@@ -55,7 +56,7 @@ namespace BaseServer
                     IPAddress[] addresses = Dns.GetHostAddresses(host);
                     if (addresses.Length == 0)
                     {
-                        LogWithTimestamp($"[ERROR] Could not resolve host: {host}");
+                        Logger.Log($"[ERROR] Could not resolve host: {host}");
                         return;
                     }
                     localAddr = addresses[0];
@@ -64,48 +65,50 @@ namespace BaseServer
                 server = new TcpListener(localAddr, port);
                 server.Start();
 
-                LogWithTimestamp($"[Server] Listening on {server.LocalEndpoint}");
+                Logger.Log($"[Server] Listening on {server.LocalEndpoint}");
 
                 // 루프백 주소로 바인딩된 경우 경고 출력
                 if (IPAddress.IsLoopback(((IPEndPoint)server.LocalEndpoint).Address))
                 {
-                    LogWithTimestamp("[WARNING] Server is bound to loopback address (127.0.0.1). External connections will fail.");
-                    LogWithTimestamp("[WARNING] Please check 'appsettings.json' and set 'Server:Host' to '0.0.0.0'.");
+                    Logger.Log("[WARNING] Server is bound to loopback address (127.0.0.1). External connections will fail.");
+                    Logger.Log("[WARNING] Please check 'appsettings.json' and set 'Server:Host' to '0.0.0.0'.");
                 }
 
-                LogWithTimestamp("[Server] Waiting for clients to connect...");
-                LogWithTimestamp("");
+                Logger.Log("[Server] Waiting for clients to connect...");
+                Logger.Log("");
 
                 while (true)
                 {
                     TcpClient client = await server.AcceptTcpClientAsync();
                     ClientSession session = new ClientSession(client);
-                    _ = Task.Run(async () => await session.StartAsync());
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await session.StartAsync();
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.Log($"[Session] Unhandled exception: {e}");
+                        }
+                    });
                 }
             }
             catch (SocketException e)
             {
-                LogWithTimestamp($"[Server] SocketException: {e}");
+                Logger.Log($"[Server] SocketException: {e}");
             }
             catch (Exception e)
             {
-                LogWithTimestamp($"[Server] Exception: {e}");
+                Logger.Log($"[Server] Exception: {e}");
             }
             finally
             {
                 server?.Stop();
                 RoomManager.Instance.Shutdown();
-                LogWithTimestamp("[Server] Shutdown complete");
+                Logger.Log("[Server] Shutdown complete");
             }
         }
 
-        /// <summary>
-        /// 타임스탬프가 있는 로그 출력
-        /// </summary>
-        static void LogWithTimestamp(string message)
-        {
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            Console.WriteLine($"[{timestamp}] {message}");
-        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using BaseServer.Core.Game.Entities;
 using BaseServer.Database;
+using BaseServer.Utils;
 using CommonLib.TableData;
 using System;
 using System.Collections.Concurrent;
@@ -111,7 +112,7 @@ namespace BaseServer.Core.Game.Managers
 
                 if (m_dic_mapData.TryAdd(mapId, newMapData))
                 {
-                    LogWithTimestamp($"[MapManager] Map Seted: {mapId}");
+                    Logger.Log($"[MapManager] Map Seted: {mapId}");
                     return newMapData;
                 }
             }
@@ -119,11 +120,5 @@ namespace BaseServer.Core.Game.Managers
             return newMapData;
         }
 
-
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
     }
 }

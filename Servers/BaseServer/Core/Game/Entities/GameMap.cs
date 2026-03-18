@@ -1,4 +1,5 @@
 ﻿using BaseServer.Core.Game.Managers;
+using BaseServer.Utils;
 using CommonLib;
 using CommonLib.TableData; // MapData, Planet, Vector2
 using System;
@@ -13,7 +14,7 @@ namespace BaseServer.Core.Game.Entities
         private MapData _staticMapData; // DB에서 로드된 정적 맵 설정
         private Dictionary<int, GamePlanet> _planetDict; // 런타임 행성 객체들 (ID로 접근)
         private Graph<GamePlanet> _mapGraph; // 행성 간 연결 그래프
-        private Dictionary<int, HashSet<int>> _pathCashDict; // 경로 캐시
+        private Dictionary<int, HashSet<int>> _pathCacheDict; // 경로 캐시 (Cache)
         private int[] _players = new int[Game.MAX_PLAYERS];
         private Dictionary<int, int> _homePlanet = new Dictionary<int, int>();
         public GamePlanet[] Planets => _planetDict.Values.ToArray();
@@ -24,7 +25,7 @@ namespace BaseServer.Core.Game.Entities
             _staticMapData = staticMapData ?? throw new ArgumentNullException(nameof(staticMapData));
             _planetDict = new Dictionary<int, GamePlanet>();
             _mapGraph = new Graph<GamePlanet>();
-            _pathCashDict = new Dictionary<int, HashSet<int>>();
+            _pathCacheDict = new Dictionary<int, HashSet<int>>();
 
             SetupMap();
         }
@@ -33,7 +34,7 @@ namespace BaseServer.Core.Game.Entities
         {
             _planetDict.Clear();
             _mapGraph = new Graph<GamePlanet>(); // 그래프 초기화
-            _pathCashDict.Clear();
+            _pathCacheDict.Clear();
 
             // PlanetInfoData를 빠르게 찾기 위해 Dictionary로 변환
             var planetInfoLookup = _staticMapData.PlanetInfos.ToDictionary(info => info.id);
@@ -58,13 +59,13 @@ namespace BaseServer.Core.Game.Entities
                     _mapGraph.AddEdge(fromPlanet, toPlanet, CommonLib.Vector2.Distance(fromPlanet.Position, toPlanet.Position));
 
                     // 경로 캐시 딕셔너리 업데이트
-                    if (!_pathCashDict.ContainsKey(path.planetFromId))
-                        _pathCashDict.Add(path.planetFromId, new HashSet<int>());
-                    _pathCashDict[path.planetFromId].Add(path.planetToId);
+                    if (!_pathCacheDict.ContainsKey(path.planetFromId))
+                        _pathCacheDict.Add(path.planetFromId, new HashSet<int>());
+                    _pathCacheDict[path.planetFromId].Add(path.planetToId);
 
-                    if (!_pathCashDict.ContainsKey(path.planetToId))
-                        _pathCashDict.Add(path.planetToId, new HashSet<int>());
-                    _pathCashDict[path.planetToId].Add(path.planetFromId);
+                    if (!_pathCacheDict.ContainsKey(path.planetToId))
+                        _pathCacheDict.Add(path.planetToId, new HashSet<int>());
+                    _pathCacheDict[path.planetToId].Add(path.planetFromId);
                 }
             }
         }
@@ -107,10 +108,10 @@ namespace BaseServer.Core.Game.Entities
 
         public bool IsValidPath(int from, int to)
         {
-            if (!_pathCashDict.ContainsKey(from))
+            if (!_pathCacheDict.ContainsKey(from))
                 return false;
 
-            return _pathCashDict[from].Contains(to);
+            return _pathCacheDict[from].Contains(to);
         }
 
         public int? GetHomePlanetId(int playerId)
@@ -120,10 +121,5 @@ namespace BaseServer.Core.Game.Entities
             return null;
         }
 
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
     }
 }

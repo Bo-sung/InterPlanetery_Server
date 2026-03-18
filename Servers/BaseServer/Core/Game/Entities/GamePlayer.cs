@@ -1,15 +1,9 @@
-﻿using BaseServer.Core.Game;
-using BaseServer.Core.Game.Managers;
+﻿using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
+using BaseServer.Utils;
 using CommonLib;
 using CommonLib.Commands;
 using CommonLib.TableData;
-using MySqlX.XDevAPI;
-using System.Data;
-using System.Net.Sockets;
-using System.Numerics;
-using System.Reflection.Emit;
-using System.Windows.Input;
 using ProtocolType = CommonLib.ProtocolType;
 
 namespace BaseServer.Core.Game.Entities
@@ -196,6 +190,14 @@ namespace BaseServer.Core.Game.Entities
             await clientSession.SendAsync(result.Serialize());
         }
 
+        public async Task Async_SendGameState(byte[] serializedData)
+        {
+            if (clientSession == null)
+                return;
+
+            await clientSession.SendAsync(serializedData);
+        }
+
         public async Task Async_SendGameStart()
         {
             if (clientSession == null)
@@ -233,11 +235,5 @@ namespace BaseServer.Core.Game.Entities
         }
         #endregion
 
-
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
     }
 }

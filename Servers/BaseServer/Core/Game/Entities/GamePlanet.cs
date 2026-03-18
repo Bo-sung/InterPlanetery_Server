@@ -1,4 +1,5 @@
-﻿using CommonLib;
+﻿using BaseServer.Utils;
+using CommonLib;
 using CommonLib.TableData;
 
 namespace BaseServer.Core.Game.Entities
@@ -58,10 +59,5 @@ namespace BaseServer.Core.Game.Entities
             }
         }
 
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
     }
 }

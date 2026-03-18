@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using BaseServer.Utils;
 using CommonLib.TableData;
 using MySql.Data.MySqlClient;
 
@@ -22,12 +23,6 @@ namespace BaseServer.Database
         public Dictionary<int, MapRouteInfoData> Map_Route_info => m_dic_map_route_info;
         public Dictionary<int, PlanetInfoData> Planet_info => m_dic_planet_info;
         public Dictionary<int, ProductionInfoData> Production_info => m_dic_production_info;
-
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
 
         private void LogErrorWithTimestamp(string message)
         {
@@ -178,7 +173,7 @@ namespace BaseServer.Database
         // 정보 로깅 메소드
         private void LogInfo(string message)
         {
-            LogWithTimestamp($"[INFO] {DateTime.Now}: {message}");
+            Logger.Log($"[INFO] {DateTime.Now}: {message}");
 
             // 파일에 로깅하는 예시
             try

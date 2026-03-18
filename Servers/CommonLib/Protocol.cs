@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Newtonsoft.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CommonLib
 {
@@ -71,6 +72,7 @@ namespace CommonLib
             return this;
         }
 
+        [return: MaybeNull]
         public T GetParam<T>(string key)
         {
             if (_parameters.TryGetValue(key, out object value))
@@ -85,9 +87,11 @@ namespace CommonLib
                     {
                         return jToken.ToObject<T>();
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 변환 실패 시 계속 진행
+#if DEBUG
+                        Console.WriteLine($"[Protocol.GetParam] JToken -> {typeof(T).Name} 변환 실패 (key={key}): {ex.Message}");
+#endif
                     }
                 }
 
@@ -98,9 +102,11 @@ namespace CommonLib
                     {
                         return JsonConvert.DeserializeObject<T>(jsonString);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 역직렬화 실패 시 기본값 반환
+#if DEBUG
+                        Console.WriteLine($"[Protocol.GetParam] JSON 역직렬화 실패 (key={key}, type={typeof(T).Name}): {ex.Message}");
+#endif
                     }
                 }
 
@@ -109,9 +115,11 @@ namespace CommonLib
                 {
                     return (T)Convert.ChangeType(value, typeof(T));
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // 변환 실패 시 기본값 반환
+#if DEBUG
+                    Console.WriteLine($"[Protocol.GetParam] 타입 변환 실패 (key={key}, type={typeof(T).Name}): {ex.Message}");
+#endif
                 }
             }
             return default(T);
@@ -128,9 +136,11 @@ namespace CommonLib
                     {
                         return jToken.ToObject<T>();
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 변환 실패 시 계속 진행
+#if DEBUG
+                        Console.WriteLine($"[Protocol.GetStruct] JToken -> {typeof(T).Name} 변환 실패 (key={key}): {ex.Message}");
+#endif
                     }
                 }
 
@@ -140,9 +150,11 @@ namespace CommonLib
                     {
                         return JsonConvert.DeserializeObject<T>(jsonString);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 역직렬화 실패 시 기본값 반환
+#if DEBUG
+                        Console.WriteLine($"[Protocol.GetStruct] JSON 역직렬화 실패 (key={key}, type={typeof(T).Name}): {ex.Message}");
+#endif
                     }
                 }
 
@@ -156,7 +168,7 @@ namespace CommonLib
         /// <summary>
         /// 객체/클래스 가져오기 (서버 호환성)
         /// </summary>
-        public T GetObject<T>(string key) where T : class
+        public T? GetObject<T>(string key) where T : class
         {
             if (_parameters.TryGetValue(key, out object value))
             {
@@ -170,9 +182,11 @@ namespace CommonLib
                     {
                         return jToken.ToObject<T>();
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 변환 실패 시 계속 진행
+#if DEBUG
+                        Console.WriteLine($"[Protocol.GetObject] JToken -> {typeof(T).Name} 변환 실패 (key={key}): {ex.Message}");
+#endif
                     }
                 }
 
@@ -182,9 +196,11 @@ namespace CommonLib
                     {
                         return JsonConvert.DeserializeObject<T>(jsonString);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 역직렬화 실패 시 null 반환
+#if DEBUG
+                        Console.WriteLine($"[Protocol.GetObject] JSON 역직렬화 실패 (key={key}, type={typeof(T).Name}): {ex.Message}");
+#endif
                     }
                 }
 
@@ -198,7 +214,7 @@ namespace CommonLib
         /// <summary>
         /// 바이트 배열 가져오기 (서버 호환성)
         /// </summary>
-        public byte[] GetBytes(string key)
+        public byte[]? GetBytes(string key)
         {
             if (_parameters.TryGetValue(key, out object value))
             {

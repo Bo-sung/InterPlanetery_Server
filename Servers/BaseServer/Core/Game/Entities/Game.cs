@@ -1,6 +1,8 @@
 ﻿using BaseServer.Core.Game.Managers;
 using BaseServer.Core.Game.Session;
 using BaseServer.Database;
+using BaseServer.Utils;
+using CommonLib;
 using CommonLib.Commands;
 using System;
 using System.Collections.Generic;
@@ -244,20 +246,10 @@ namespace BaseServer.Core.Game.Entities
                 m_players[i] = new GamePlayer();
             }
 
-            LogWithTimestamp("[Game] Game instance created");
+            Logger.Log("[Game] Game instance created");
         }
         #endregion
 
-        #region 로깅
-        /// <summary>
-        /// 타임스탬프가 포함된 로그 출력
-        /// </summary>
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            Console.WriteLine($"[{timestamp}] {message}");
-        }
-        #endregion
 
         #region 커맨드 관리
         /// <summary>
@@ -271,14 +263,14 @@ namespace BaseServer.Core.Game.Entities
             // null 체크
             if (command == null)
             {
-                LogWithTimestamp("[Game] Cannot enqueue null command");
+                Logger.Log("[Game] Cannot enqueue null command");
                 return;
             }
 
             // 게임이 실행 중인지 확인
             if (m_gameState != GAMESTATE_RUNNING)
             {
-                LogWithTimestamp($"[Game] Cannot enqueue command - game not running (state: {m_gameState})");
+                Logger.Log($"[Game] Cannot enqueue command - game not running (state: {m_gameState})");
                 return;
             }
 
@@ -317,7 +309,7 @@ namespace BaseServer.Core.Game.Entities
                 // 명령 추가
                 m_commandQueue[targetTick].Add(command);
 
-                LogWithTimestamp($"[Game] Command queued for tick {targetTick} " +
+                Logger.Log($"[Game] Command queued for tick {targetTick} " +
                     $"(Type: {command.Type}, Player: {command.PlayerId}, Current: {currentTick})");
             }
             await Task.CompletedTask;
@@ -338,7 +330,7 @@ namespace BaseServer.Core.Game.Entities
             // null 체크
             if (session == null || commandSender == null)
             {
-                LogWithTimestamp("[Game] Cannot join - null session or command sender");
+                Logger.Log("[Game] Cannot join - null session or command sender");
                 return false;
             }
 
@@ -350,13 +342,13 @@ namespace BaseServer.Core.Game.Entities
                 {
                     // 플레이어 초기화 및 세션 연결
                     m_players[i].Initialize(session, commandSender);
-                    LogWithTimestamp($"[Game] Player {session.SessionId} joined at slot {i}");
+                    Logger.Log($"[Game] Player {session.SessionId} joined at slot {i}");
                     return true;
                 }
             }
 
             // 모든 슬롯이 찼을 경우
-            LogWithTimestamp("[Game] Cannot join - game is full");
+            Logger.Log("[Game] Cannot join - game is full");
             return false;
         }
 
@@ -378,7 +370,7 @@ namespace BaseServer.Core.Game.Entities
                 {
                     // 플레이어 슬롯 정리
                     m_players[i].Cleanup();
-                    LogWithTimestamp($"[Game] Player {session.SessionId} left from slot {i}");
+                    Logger.Log($"[Game] Player {session.SessionId} left from slot {i}");
                     return true;
                 }
             }
@@ -422,7 +414,7 @@ namespace BaseServer.Core.Game.Entities
             // 게임 상태 확인 (WAITING 상태에서만 시작 가능)
             if (m_gameState != GAMESTATE_WAITING)
             {
-                LogWithTimestamp($"[Game] Cannot start - invalid state: {m_gameState}");
+                Logger.Log($"[Game] Cannot start - invalid state: {m_gameState}");
                 return false;
             }
 
@@ -430,7 +422,7 @@ namespace BaseServer.Core.Game.Entities
             MapData? staticMapData = m_mapManager.LoadMapData(mapIndex);
             if (staticMapData == null)
             {
-                LogWithTimestamp($"[Game] Failed to load map data (index: {mapIndex})");
+                Logger.Log($"[Game] Failed to load map data (index: {mapIndex})");
                 return false;
             }
 
@@ -465,11 +457,11 @@ namespace BaseServer.Core.Game.Entities
 
             m_produceController.OnProductionFinish += HandleOnProductionFinish;
 
-            LogWithTimestamp($"[Game] Broadcasting GameSet to all clients...");
+            Logger.Log($"[Game] Broadcasting GameSet to all clients...");
             // 1단계: 모든 플레이어에게 GameSet 정보 전송
             await BroadcastGameSet(staticMapData);
 
-            LogWithTimestamp($"[Game] Waiting for all clients to acknowledge GameSet...");
+            Logger.Log($"[Game] Waiting for all clients to acknowledge GameSet...");
             // 2단계: 모든 클라이언트에서 REQUEST_GAME_CL_READY를 받을 때까지 대기
             await WaitUntilUsersReadyAll();
 
@@ -481,7 +473,7 @@ namespace BaseServer.Core.Game.Entities
             m_gameLoopCts = new CancellationTokenSource();                // 게임 루프 취소 토큰 생성
 
             await BroadcastGameStart();
-            LogWithTimestamp($"[Game] Game started with map {mapIndex}");
+            Logger.Log($"[Game] Game started with map {mapIndex}");
 
             // 게임 루프를 별도 Task로 시작 (비동기 실행)
             _ = Task.Run(() => GameLoop(m_gameLoopCts.Token));
@@ -505,7 +497,7 @@ namespace BaseServer.Core.Game.Entities
         {
             const float deltaTime = FIXED_TICK_RATE; // 고정 델타타임 (50ms)
 
-            LogWithTimestamp("[Game] Game loop started");
+            Logger.Log("[Game] Game loop started");
 
             try
             {
@@ -531,25 +523,25 @@ namespace BaseServer.Core.Game.Entities
                     else if (delay < -0.01) // 10ms 이상 지연되면 경고
                     {
                         // 틱 처리가 목표 시간보다 오래 걸린 경우
-                        LogWithTimestamp($"[Game] Tick {m_tickCount} lagging: {-delay * 1000:F2}ms behind");
+                        Logger.Log($"[Game] Tick {m_tickCount} lagging: {-delay * 1000:F2}ms behind");
                     }
                 }
             }
             catch (OperationCanceledException)
             {
                 // 게임 루프가 취소된 경우 (정상 종료)
-                LogWithTimestamp("[Game] Game loop cancelled");
+                Logger.Log("[Game] Game loop cancelled");
             }
             catch (Exception ex)
             {
                 // 예상치 못한 예외 발생 (비정상 종료)
-                LogWithTimestamp($"[Game] Fatal error in game loop: {ex.Message}\n{ex.StackTrace}");
+                Logger.Log($"[Game] Fatal error in game loop: {ex.Message}\n{ex.StackTrace}");
                 m_gameState = GAMESTATE_ENDED;
             }
             finally
             {
                 // 게임 루프 종료 시 리소스 정리
-                LogWithTimestamp("[Game] Game loop ended");
+                Logger.Log("[Game] Game loop ended");
                 Cleanup();
             }
         }
@@ -616,7 +608,7 @@ namespace BaseServer.Core.Game.Entities
             if (completedTask == timeoutTask)
             {
                 // 타임아웃 발생 - 이벤트 핸들러 정리 및 로그
-                LogWithTimestamp($"[Game] WaitUntilUsersReadyAll timeout ({TIMEOUT_MS}ms) - Ready count: {readyRequireCount}/{m_players.Length}");
+                Logger.Log($"[Game] WaitUntilUsersReadyAll timeout ({TIMEOUT_MS}ms) - Ready count: {readyRequireCount}/{m_players.Length}");
 
                 foreach (var player in m_players)
                 {
@@ -625,11 +617,11 @@ namespace BaseServer.Core.Game.Entities
                 }
 
                 // 타임아웃 시에도 게임 시작
-                LogWithTimestamp($"[Game] Forcing game start despite timeout");
+                Logger.Log($"[Game] Forcing game start despite timeout");
             }
             else
             {
-                LogWithTimestamp($"[Game] All players ready");
+                Logger.Log($"[Game] All players ready");
             }
         }
 
@@ -637,7 +629,7 @@ namespace BaseServer.Core.Game.Entities
         {
             if (mapData == null)
             {
-                LogWithTimestamp($"[Game] BroadcastGameSet failed - mapData is null");
+                Logger.Log($"[Game] BroadcastGameSet failed - mapData is null");
                 return;
             }
 
@@ -649,7 +641,7 @@ namespace BaseServer.Core.Game.Entities
                 }
             }
 
-            LogWithTimestamp($"[Game] GameSet broadcasted to all players");
+            Logger.Log($"[Game] GameSet broadcasted to all players");
         }
 
         private async Task BroadcastGameStart()
@@ -754,7 +746,7 @@ namespace BaseServer.Core.Game.Entities
             if (m_gameState == GAMESTATE_ENDED)
                 return;
 
-            LogWithTimestamp("[Game] Stopping game...");
+            Logger.Log("[Game] Stopping game...");
             m_gameState = GAMESTATE_ENDED;
             m_gameLoopCts?.Cancel(); // 게임 루프 취소
         }
@@ -767,7 +759,7 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void Cleanup()
         {
-            LogWithTimestamp("[Game] Cleaning up resources...");
+            Logger.Log("[Game] Cleaning up resources...");
 
             // 게임 상태 종료
             m_gameState = GAMESTATE_ENDED;
@@ -788,7 +780,7 @@ namespace BaseServer.Core.Game.Entities
             // 맵 정리
             m_gameMap = null;
 
-            LogWithTimestamp("[Game] Cleanup completed");
+            Logger.Log("[Game] Cleanup completed");
         }
         #endregion
 
@@ -849,7 +841,7 @@ namespace BaseServer.Core.Game.Entities
 
                     default:
                         // 알 수 없는 명령 타입
-                        LogWithTimestamp($"[Game] Unknown command type: {command.Type}");
+                        Logger.Log($"[Game] Unknown command type: {command.Type}");
                         break;
                 }
             }
@@ -857,7 +849,7 @@ namespace BaseServer.Core.Game.Entities
             {
                 // 명령 실행 중 예외 발생 시 로그 출력
                 // 한 명령의 실패가 전체 게임을 멈추지 않도록 함
-                LogWithTimestamp($"[Game] Error executing command (Type: {command.Type}, Player: {command.PlayerId}): {ex.Message}");
+                Logger.Log($"[Game] Error executing command (Type: {command.Type}, Player: {command.PlayerId}): {ex.Message}");
             }
         }
 
@@ -871,28 +863,28 @@ namespace BaseServer.Core.Game.Entities
             // 타입 캐스팅 및 검증
             if (command is not MoveFleetCommand moveCommand)
             {
-                LogWithTimestamp($"[Game] Invalid MoveFleetCommand");
+                Logger.Log($"[Game] Invalid MoveFleetCommand");
                 return;
             }
             var fleetId = moveCommand.TargetFleet;
             var playerId = moveCommand.PlayerId;
             var planetId = moveCommand.TargetPlanetId;
             // 이동 명령 실행
-            LogWithTimestamp($"[Game] Move fleet command: Player {playerId}, " +
+            Logger.Log($"[Game] Move fleet command: Player {playerId}, " +
                 $"Fleet {fleetId} -> Planet {planetId}");
 
             lock (m_fleetsLock)
             {
             if (!m_dic_fleets.TryGetValue(fleetId, out var fleet))
             {
-                LogWithTimestamp($"[Game] Invalid TargetFleet!! : TargetFleet = {fleetId}");
+                Logger.Log($"[Game] Invalid TargetFleet!! : TargetFleet = {fleetId}");
                 return;
             }
 
             var planet = m_gameMap?.GetPlanet(planetId);
             if (planet == null)
             {
-                LogWithTimestamp($"[Game] Invalid TargetPlanetId!! : TargetPlanetId = {planetId}");
+                Logger.Log($"[Game] Invalid TargetPlanetId!! : TargetPlanetId = {planetId}");
                 return;
             }
 
@@ -911,7 +903,7 @@ namespace BaseServer.Core.Game.Entities
             // 타입 캐스팅 및 검증
             if (command is not ProduceFleetCommand produceCommand)
             {
-                LogWithTimestamp($"[Game] Invalid ProduceFleetCommand");
+                Logger.Log($"[Game] Invalid ProduceFleetCommand");
                 return;
             }
 
@@ -921,14 +913,14 @@ namespace BaseServer.Core.Game.Entities
             // DB에서 생산 정보 조회
             if (!m_dbManager.Table.Production_info.TryGetValue(targetId, out var produceFleetData))
             {
-                LogWithTimestamp($"[Game] Invalid production target ID: {targetId}");
+                Logger.Log($"[Game] Invalid production target ID: {targetId}");
                 return;
             }
 
             GamePlayer player = GetPlayer(playerId);
             if (player == null)
             {
-                LogWithTimestamp($"[Game] Invalid playerId: {playerId}");
+                Logger.Log($"[Game] Invalid playerId: {playerId}");
                 return;
             }
 
@@ -937,7 +929,7 @@ namespace BaseServer.Core.Game.Entities
                 player.MaxSupply - player.Supply < produceFleetData.SupplyCost)
             {
 
-                LogWithTimestamp($"[Game] Low Resouces : {0}");
+                Logger.Log($"[Game] Low Resouces : {0}");
                 return;
             }
 
@@ -949,7 +941,7 @@ namespace BaseServer.Core.Game.Entities
             player.Supply += produceFleetData.SupplyCost;
 
             // 생산 컨트롤러에게 생산 요청
-            LogWithTimestamp($"[Game] Produce fleet command: Player {playerId}, Fleet ID {id}, Target {targetId}");
+            Logger.Log($"[Game] Produce fleet command: Player {playerId}, Fleet ID {id}, Target {targetId}");
             if(!m_produceController.RequestProcess(produceFleetData, playerId, id, currentTick))
             {
                 // 생산 실패 시 자원 환불
@@ -1099,7 +1091,7 @@ namespace BaseServer.Core.Game.Entities
 
                             if (m_dic_fleets.Remove(fleetId))
                             {
-                                LogWithTimestamp($"[Game] Fleet {fleetId} removed from dictionary (destroyed)");
+                                Logger.Log($"[Game] Fleet {fleetId} removed from dictionary (destroyed)");
                             }
                         }
                     }
@@ -1265,7 +1257,7 @@ namespace BaseServer.Core.Game.Entities
 
             if(result != NOWINNER)
             {
-                LogWithTimestamp($"[Game] Player faction {result} wins!");
+                Logger.Log($"[Game] Player faction {result} wins!");
 
                 if (result == PLAYER_FACTION_1)
                 {
@@ -1277,7 +1269,7 @@ namespace BaseServer.Core.Game.Entities
                 }
                 else
                 {
-                    LogWithTimestamp($"[Game] Unknown winner faction: {result}");
+                    Logger.Log($"[Game] Unknown winner faction: {result}");
                     m_gameState = GAMESTATE_ENDED;
                 }
             }
@@ -1292,18 +1284,26 @@ namespace BaseServer.Core.Game.Entities
         {
             if (m_gameMap == null)
             {
-                LogWithTimestamp("[Game] m_gameMap == null");
+                Logger.Log("[Game] m_gameMap == null");
                 return;
             }
+
             GameState state;
             lock (m_fleetsLock)
             {
                 state = new GameState(m_gameMap, m_players, m_dic_fleets, m_gameState, currentTick, m_produceController);
             }
+
+            // 직렬화 1회만 수행 후 동일 바이트 배열을 모든 플레이어에게 전송
+            Protocol result = new Protocol(ProtocolType.GAME_STATE);
+            result.AddObject<GameState>("gameState", state);
+            result.AddParam("serverTick", currentTick);
+            byte[] data = result.Serialize();
+
             foreach (var player in m_players)
             {
                 if (player != null && player.IsValid)
-                    player.Async_SendGameState(state,currentTick);
+                    _ = player.Async_SendGameState(data);
             }
         }
         #endregion
@@ -1338,7 +1338,7 @@ namespace BaseServer.Core.Game.Entities
                 m_gameLoopCts?.Cancel();    // 게임 루프 취소
                 m_gameLoopCts?.Dispose();   // CancellationTokenSource 해제
 
-                LogWithTimestamp("[Game] Disposed");
+                Logger.Log("[Game] Disposed");
             }
 
             m_disposed = true;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BaseServer.Utils;
 using CommonLib;
 
 namespace BaseServer.Network
@@ -21,12 +22,6 @@ namespace BaseServer.Network
 			m_handlers = new Dictionary<int, ProtocolHandlerDelegate>();
 		}
 
-        private void LogWithTimestamp(string message)
-        {
-            var timestamp = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            System.Console.WriteLine($"[{timestamp}] {message}");
-        }
-
         /// <summary>
         /// 핸들러 등록
         /// </summary>
@@ -34,7 +29,7 @@ namespace BaseServer.Network
 		{
 			if (m_handlers.ContainsKey(_protocolType))
 			{
-				LogWithTimestamp($"[ProtocolHandler] Warning: Handler for protocol type {_protocolType} already exists. Overwriting.");
+				Logger.Log($"[ProtocolHandler] Warning: Handler for protocol type {_protocolType} already exists. Overwriting.");
 			}
 
 			m_handlers[_protocolType] = _handler;
@@ -64,12 +59,12 @@ namespace BaseServer.Network
 				}
 				catch (Exception e)
 				{
-					LogWithTimestamp($"[ProtocolHandler] Error handling protocol {_protocol.Type}: {e.Message}");
+					Logger.Log($"[ProtocolHandler] Error handling protocol {_protocol.Type}: {e.Message}");
 				}
 			}
 			else
 			{
-				LogWithTimestamp($"[ProtocolHandler] No handler registered for protocol type: {_protocol.Type}");
+				Logger.Log($"[ProtocolHandler] No handler registered for protocol type: {_protocol.Type}");
 			}
 		}
 
