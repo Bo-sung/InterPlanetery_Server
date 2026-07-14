@@ -49,9 +49,9 @@ namespace CommonLib.TableData
                     continue;
                 if (!int.TryParse(reader[colNames[3]].ToString(), out int MaxHealth))
                     continue;
-                if (!int.TryParse(reader[colNames[3]].ToString(), out int AttackPower))
+                if (!int.TryParse(reader[colNames[4]].ToString(), out int AttackPower))
                     continue;
-                if (!int.TryParse(reader[colNames[4]].ToString(), out int MoveSpeed))
+                if (!float.TryParse(reader[colNames[5]].ToString(), out float MoveSpeed))
                     continue;
                 FleetInfoData data = new FleetInfoData(
                     id: id,

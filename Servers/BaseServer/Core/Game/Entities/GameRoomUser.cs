@@ -46,7 +46,7 @@ namespace BaseServer.Core.Game.Entities
         /// <param name="session"></param>
         public void Initialize(ClientSession session)
         {
-            if (m_session == null)
+            if (m_session != null)
                 Cleanup();
             this.m_session = session;
             m_id = session.UserInfo.UserId;
@@ -60,11 +60,11 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         public void Cleanup()
         {
+            UnRegistorProtos();
+
             this.m_session = null;
             m_id = DEFAULT_ID;
             m_name = DEFAULT_NAME;
-
-            UnRegistorProtos();
         }
 
         public void ForceDisconnect()

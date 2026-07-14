@@ -22,13 +22,24 @@ namespace BaseServer.Core.Game.Session
     {
         public string SessionId { get; private set; }
         public TcpClient TcpClient { get; private set; }
-        public Entities.GameRoom? CurrentRoom { get; set; }
+        public Entities.GameRoom? CurrentRoom { get; internal set; }
         public UserInfo UserInfo => m_userInfo;
+        internal int RegisteredProtocolHandlerCount => m_protocolHandler.HandlerCount;
+        public SessionState State
+        {
+            get
+            {
+                lock (m_stateLock)
+                    return m_state;
+            }
+        }
 
         private NetworkStream m_stream;
         private bool m_isConnected = true;
         private UserInfo m_userInfo;
         private readonly object m_sendLock = new object();
+        private readonly object m_stateLock = new object();
+        private SessionState m_state = SessionState.Connected;
 
         // 타임아웃 관련
         private DateTime m_lastActivityTime;
@@ -85,14 +96,35 @@ namespace BaseServer.Core.Game.Session
             m_protocolHandler.RegisterHandler(CommonLib.ProtocolType.REQUEST_JOIN_ROOM, Handle_RequestJoinRoom);
         }
 
-        public void RegisterProto(int Protocol, ProtocolHandlerDelegate handler)
+        internal void RegisterProto(int Protocol, ProtocolHandlerDelegate handler)
         {
             m_protocolHandler.RegisterHandler(Protocol, handler);
         }
 
-        public void UnRegisterProto(int Protocol)
+        internal void UnRegisterProto(int Protocol)
         {
             m_protocolHandler.UnregisterHandler(Protocol);
+        }
+
+        internal bool TryTransitionTo(SessionState nextState)
+        {
+            SessionState previousState;
+            lock (m_stateLock)
+            {
+                previousState = m_state;
+                if (!SessionProtocolPolicy.CanTransition(previousState, nextState))
+                {
+                    LogWithTimestamp($"[Session {SessionId}] Invalid state transition: {previousState} -> {nextState}");
+                    return false;
+                }
+
+                m_state = nextState;
+            }
+
+            if (previousState != nextState)
+                LogWithTimestamp($"[Session {SessionId}] State changed: {previousState} -> {nextState}");
+
+            return true;
         }
 
         /// <summary>
@@ -267,6 +299,16 @@ namespace BaseServer.Core.Game.Session
         /// </summary>
         private async Task HandleProtocol(Protocol _protocol)
         {
+            SessionState state = State;
+            if (!SessionProtocolPolicy.IsAllowed(state, _protocol.Type))
+            {
+                LogWithTimestamp($"[Session {SessionId}] Protocol {_protocol.Type} denied in state {state}");
+                var response = new Response(_protocol.Type, StateCode.ACCESS_DENY,
+                    $"Protocol {_protocol.Type} is not allowed while session is {state}");
+                await SendAsync(response.Serialize());
+                return;
+            }
+
             await m_protocolHandler.HandleProtocol(_protocol);
         }
 
@@ -464,6 +506,11 @@ namespace BaseServer.Core.Game.Session
             
             // 인증 성공 - UserInfo 설정
             m_userInfo = userinfo.Value;
+            if (!TryTransitionTo(SessionState.Authenticated))
+            {
+                Disconnect();
+                return;
+            }
             LogWithTimestamp($"[Session {SessionId}] Login Success - UserId: {m_userInfo.UserId}, UserName: {m_userInfo.UserName}");
 
             var response = new Response(protocol.Type, StateCode.SUCCESS);
@@ -509,6 +556,8 @@ namespace BaseServer.Core.Game.Session
         private async Task Handle_RequestJoinLobby(Protocol protocol)
         {
             int page = protocol.GetParam<int>("Page");
+            if (!TryTransitionTo(SessionState.Lobby))
+                return;
 
             LogWithTimestamp($"[Session {SessionId}] Join Lobby Request - UserName: {m_userInfo.UserName}, Page: {page}");
 
@@ -707,6 +756,7 @@ namespace BaseServer.Core.Game.Session
                 return;
 
             m_isConnected = false;
+            TryTransitionTo(SessionState.Disconnected);
             LogWithTimestamp($"[Session {SessionId}] Disconnecting...");
 
             try

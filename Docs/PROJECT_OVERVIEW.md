@@ -66,17 +66,17 @@ InterPlanetery_Server/
 ## 🗄️ 데이터베이스 구조
 
 ### 현재 사용 중인 테이블
-- **maps**: 맵 정보 (player1_homeworld_id, player2_homeworld_id)
+- **map_info**: 맵 정보 (player1_homeworld_id, player2_homeworld_id)
 - **planet_info**: 행성 정보 (name, mineral, gas, supply)
-- **map_planets**: 맵별 행성 배치 (position_x, position_y)
-- **planet_routes**: 행성 간 연결 정보
+- **map_planet_info**: 맵별 행성 배치 (position_x, position_y)
+- **map_route_info**: 행성 간 연결 정보
 - **fleet_info**: 함대 기본 스탯 정보
-- **production_data**: 생산 정보
+- **production_info**: 생산 정보
 
 ### DB 연결 정보
 - **MySQL 주소**: localhost:3306
-- **게임 데이터 DB**: interplanetery_tabledb
-- **인증 DB**: interplanetery_authdb
+- **게임 데이터 DB**: interplanetery_tabledb_local
+- **인증 DB**: interplanetery_authdb_local
 
 ---
 

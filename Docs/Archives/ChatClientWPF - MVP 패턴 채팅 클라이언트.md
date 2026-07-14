@@ -1,3 +1,7 @@
+> **⚠️ ARCHIVED — 중복 문서.** 원본은 [`Servers/ChatClientWPF/README.md`](../../Servers/ChatClientWPF/README.md)에
+> 있습니다. `ChatClientWPF`는 채팅 프로토타입(`ChatClientModel`) 흔적이 남은 레거시 테스트 도구이며
+> 현재 게임 서버(`BaseServer`) 배포 대상이 아닙니다.
+
 # ChatClientWPF - MVP 패턴 채팅 클라이언트
 
 WPF 기반 채팅 클라이언트로, **MVP(Model-View-Presenter)** 패턴을 충실히 따라 구현되었습니다.

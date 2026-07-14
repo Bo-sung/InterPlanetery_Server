@@ -293,7 +293,47 @@ namespace CommonLib
                     _config = GetDefaultConfig();
                     LogCurrentConfig();
                 }
+
+                ApplyEnvironmentOverrides();
             }
+        }
+
+        /// <summary>
+        /// appsettings.json 로드 후, ASP.NET 이중 밑줄 표기법(Databases__Table__Server 등)의
+        /// 환경 변수가 설정되어 있으면 해당 값으로 덮어씁니다. 변수가 없으면 파일 값을 그대로 유지합니다
+        /// (compatibility alias — Docker/compose 배포에서 appsettings.json을 편집하지 않고도 값을 주입할 수 있게 함).
+        /// </summary>
+        private void ApplyEnvironmentOverrides()
+        {
+            if (_config == null)
+            {
+                return;
+            }
+
+            _config.Databases ??= new DatabasesConfig();
+            _config.Databases.Table = ApplyDbEnvOverrides(_config.Databases.Table, "Databases__Table__");
+            _config.Databases.Auth = ApplyDbEnvOverrides(_config.Databases.Auth, "Databases__Auth__");
+        }
+
+        private static DatabaseConfig ApplyDbEnvOverrides(DatabaseConfig? db, string prefix)
+        {
+            db ??= new DatabaseConfig();
+
+            string? server = Environment.GetEnvironmentVariable(prefix + "Server");
+            string? userId = Environment.GetEnvironmentVariable(prefix + "UserId");
+            string? password = Environment.GetEnvironmentVariable(prefix + "Password");
+            string? databaseName = Environment.GetEnvironmentVariable(prefix + "DatabaseName");
+            string? portStr = Environment.GetEnvironmentVariable(prefix + "Port");
+            string? connectionString = Environment.GetEnvironmentVariable(prefix + "ConnectionString");
+
+            if (!string.IsNullOrEmpty(server)) db.Server = server;
+            if (!string.IsNullOrEmpty(userId)) db.UserId = userId;
+            if (!string.IsNullOrEmpty(password)) db.Password = password;
+            if (!string.IsNullOrEmpty(databaseName)) db.DatabaseName = databaseName;
+            if (!string.IsNullOrEmpty(connectionString)) db.ConnectionString = connectionString;
+            if (!string.IsNullOrEmpty(portStr) && int.TryParse(portStr, out int port)) db.Port = port;
+
+            return db;
         }
 
         /// <summary>
@@ -445,7 +485,7 @@ namespace CommonLib
                     {
                         Server = "localhost",
                         UserId = "root",
-                        Password = "asdf1358@@",
+                        Password = "",
                         DatabaseName = "interplanetery_tabledb_local",
                         Port = 3306
                     },
@@ -453,7 +493,7 @@ namespace CommonLib
                     {
                         Server = "localhost",
                         UserId = "root",
-                        Password = "asdf1358@@",
+                        Password = "",
                         DatabaseName = "interplanetery_authdb_local",
                         Port = 3306
                     }
@@ -527,7 +567,7 @@ namespace CommonLib
         /// </summary>
         private string GetDefaultTableConnectionString()
         {
-            return "server=localhost;user=root;password=asdf1358@@;database=interplanetery_tabledb_local;port=3306;";
+            return "server=localhost;user=root;password=;database=interplanetery_tabledb_local;port=3306;";
         }
 
         /// <summary>
@@ -535,7 +575,7 @@ namespace CommonLib
         /// </summary>
         private string GetDefaultAuthConnectionString()
         {
-            return "server=localhost;user=root;password=asdf1358@@;database=interplanetery_authdb_local;port=3306;";
+            return "server=localhost;user=root;password=;database=interplanetery_authdb_local;port=3306;";
         }
 
         #region Config Data Classes

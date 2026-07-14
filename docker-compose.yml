@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ========================================
   # Interplanetary Game Server
@@ -9,20 +7,31 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: interplanetary-server
+    # The server listens on its canonical container port 9000. The independently
+    # configurable host port defaults to the historical Docker port 11021.
     ports:
-      - "11021:11021"
+      - "${SERVER_HOST_PORT:-11021}:9000"
     environment:
-      # Database Configuration
-      - Database__Server=mysql-server
-      - Database__UserId=root
-      - Database__Password=changeme_password
-      - Database__DatabaseName=interplanetery_tabledb
-      - Database__Port=3306
-      
-      # Server Configuration
+      # Database Configuration — keys match CommonLib.AppConfig's ConfigData binding
+      # (Databases:Table:* / Databases:Auth:* in appsettings.json). AppConfig.LoadConfig
+      # applies these "Databases__Table__*"/"Databases__Auth__*" env vars as overrides
+      # on top of the appsettings.json baked into the image.
+      - Databases__Table__Server=mysql-server
+      - Databases__Table__UserId=root
+      - Databases__Table__Password=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+      - Databases__Table__DatabaseName=interplanetery_tabledb_local
+      - Databases__Table__Port=3306
+      - Databases__Auth__Server=mysql-server
+      - Databases__Auth__UserId=root
+      - Databases__Auth__Password=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+      - Databases__Auth__DatabaseName=interplanetery_authdb_local
+      - Databases__Auth__Port=3306
+
+      # Server Configuration — Program.cs reads these as "Server__Host"/"Server__Port"
+      # overrides (double-underscore = ':') on top of appsettings.json.
       - Server__Host=0.0.0.0
-      - Server__Port=11021
-      
+      - Server__Port=9000
+
       # Logging
       - Logging__LogLevel=Info
     
@@ -45,20 +54,27 @@ services:
     image: mysql:8.0
     container_name: mysql-server
     environment:
-      MYSQL_ROOT_PASSWORD: changeme_password
-      MYSQL_DATABASE: interplanetery_tabledb
+      # Compose refuses to start until the caller supplies this value.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+      # Only the TableDB is created here (mysql:8.0's MYSQL_DATABASE creates one DB and
+      # runs docker-entrypoint-initdb.d/*.sql against it — the DDL below has no CREATE
+      # DATABASE statement, so it applies to this one). The AuthDB
+      # (interplanetery_authdb_local / userinfo) is NOT created by this compose file —
+      # login/register will fail until it is created manually. See the root README.md
+      # "Docker로 전체 실행" section for this known gap.
+      MYSQL_DATABASE: interplanetery_tabledb_local
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
-    
+
     ports:
       - "3306:3306"
-    
+
     volumes:
       - mysql-data:/var/lib/mysql
       - ./Docs/#DB DDL 모음.sql:/docker-entrypoint-initdb.d/init.sql
-    
+
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pchangeme_password"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -79,7 +95,8 @@ services:
       PMA_HOST: mysql-server
       PMA_PORT: 3306
       PMA_USER: root
-      PMA_PASSWORD: changeme_password
+      # Placeholder — must match mysql's MYSQL_ROOT_PASSWORD above; change both together.
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
     
     ports:
       - "8080:80"

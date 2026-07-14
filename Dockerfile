@@ -28,18 +28,20 @@ WORKDIR /app
 # Copy published files
 COPY --from=build /app/publish .
 
-# Copy configuration template
+# Copy configuration template (placeholder DB values — override via
+# Databases__Table__*/Databases__Auth__* env vars at run time, see docker-compose.yml)
 COPY Servers/BaseServer/appsettings.example.json ./appsettings.json
 
 # Create logs directory
 RUN mkdir -p /app/logs
 
-# Expose port
-EXPOSE 11021
+# The application uses its canonical port inside the container. Compose may publish
+# it through a different host port (11021 by default).
+EXPOSE 9000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD netstat -an | grep 11021 || exit 1
+  CMD netstat -an | grep 9000 || exit 1
 
 # Run server
 ENTRYPOINT ["dotnet", "BaseServer.dll"]

@@ -259,17 +259,17 @@ stateDiagram-v2
 
 #### 3.1.1 Planet (행성)
 
-**DB 테이블**: `planet_info`, `map_planets`, `planet_routes`
+**DB 테이블**: `planet_info`, `map_planet_info`, `map_route_info`
 
 | 속성 | 타입 | 설명 | DB 매핑 |
 |------|------|------|---------|
 | Id | int | 행성 ID | planet_info.id |
 | Name | string | 행성 이름 | planet_info.name |
-| Position | Vector2 | 맵 좌표 (x, y) | map_planets.position_x, position_y |
+| Position | Vector2 | 맵 좌표 (x, y) | map_planet_info.position_x, position_y |
 | Mineral | int | 광물 생산량/초 | planet_info.mineral |
 | Gas | int | 가스 생산량/초 | planet_info.gas |
 | Supply | int | 보급품 증가량 | planet_info.supply |
-| AdjacentPlanetIds | List<int> | 인접 행성 ID 목록 | planet_routes |
+| AdjacentPlanetIds | List<int> | 인접 행성 ID 목록 | map_route_info |
 
 **런타임 데이터** (DB 미저장, 메모리만):
 - OwnerId: int? (소유 플레이어 ID, null = 중립)
@@ -277,7 +277,7 @@ stateDiagram-v2
 - GarrisonFleetId: int? (주둔 함대 ID)
 
 **모성(Homeworld) 판정**:
-- `maps` 테이블의 `player1_homeworld_id`, `player2_homeworld_id`로 판정
+- `map_info` 테이블의 `player1_homeworld_id`, `player2_homeworld_id`로 판정
 - 맵별로 다른 행성을 모성으로 지정 가능
 
 **모성의 특수 기능**:
@@ -291,7 +291,7 @@ stateDiagram-v2
 
 **DB 테이블**: `fleet_info` (함대 종류별 기본 능력치)
 - `fleet_info`: 각 함대 종류(Scout, Fighter 등)의 `max_health`, `attack_power`, `move_speed`
-- `production_data`: 각 함대 종류의 생산 비용 및 시간
+- `production_info`: 각 함대 종류의 생산 비용 및 시간
 
 **런타임 데이터** (DB 미저장, 게임 메모리에서만 관리):
 
@@ -347,7 +347,7 @@ stateDiagram-v2
 | Phase | GamePhase | 게임 단계 (Lobby/Loading/Playing/Ended) |
 | GameTime | float | 경과 시간 (초) |
 | TickCount | long | 틱 카운터 |
-| MapId | int | 맵 ID (maps.id) |
+| MapId | int | 맵 ID (map_info.id) |
 | Players | Dictionary<int, Player> | 플레이어 목록 (Key: 1, 2) |
 | Planets | Dictionary<int, Planet> | 행성 목록 (Key: planet_id) |
 | Fleets | Dictionary<int, Fleet> | 함대 목록 (Key: fleet_id) |
@@ -362,19 +362,19 @@ stateDiagram-v2
 **참고 문서**: [#DB DDL 모음.sql](../#DB%20DDL%20모음.sql)
 
 **현재 사용 중인 테이블**:
-- `maps` - 맵 정보 (player1_homeworld_id, player2_homeworld_id 포함)
+- `map_info` - 맵 정보 (player1_homeworld_id, player2_homeworld_id 포함)
 - `planet_info` - 행성 정보 (name, mineral, gas, supply)
-- `map_planets` - 맵별 행성 배치 (position_x, position_y)
-- `planet_routes` - 행성 간 연결 정보
+- `map_planet_info` - 맵별 행성 배치 (position_x, position_y)
+- `map_route_info` - 행성 간 연결 정보
 - `fleet_info` - 함대 기본 스탯 정보
-- `production_data` - 생산 정보
+- `production_info` - 생산 정보
 
 #### 3.2.2 게임 시작 시 맵 로드 절차
 
-1. `maps` 테이블에서 선택한 맵 정보 로드
-2. `map_planets`에서 해당 맵의 행성 배치 로드
+1. `map_info` 테이블에서 선택한 맵 정보 로드
+2. `map_planet_info`에서 해당 맵의 행성 배치 로드
 3. `planet_info`에서 각 행성의 자원 정보 로드
-4. `planet_routes`에서 행성 간 연결 정보 로드
+4. `map_route_info`에서 행성 간 연결 정보 로드
 5. `player1_homeworld_id`, `player2_homeworld_id`로 각 플레이어의 모성 설정
 
 ### 3.3 게임 설정 (Config)
@@ -491,7 +491,7 @@ flowchart TD
 
 **실패 조건**:
 1. 이미 이동 중인 함대
-2. **직행 경로가 존재하지 않음** (`planet_routes`에 출발-도착 경로 없음)
+2. **직행 경로가 존재하지 않음** (`map_route_info`에 출발-도착 경로 없음)
 3. **목적지에 아군 함대가 이미 주둔 중**
 4. 타인 소유 함대
 
@@ -670,7 +670,13 @@ WPF 테스트 클라이언트는 서버 기능을 빠르게 검증하고 개발�
 
 #### 6.2.2 게임 명령 (Game Commands)
 
-**3010 - SUBMIT_COMMAND** (게임 명령 제출)
+**30100 - SUBMIT_COMMAND** (게임 명령 제출)
+> 실제 opcode는 30100입니다 (과거 3010으로 잘못 기재되어 있었음 — `Docs/Protocol_Comparison.md`,
+> `클라이언트_구현_가이드.md` 참고).
+
+> ⚠️ **누락된 게임 S→C opcode**: `GAME_SET`, `GAME_STARTED`, `GAME_STATE`(20202, 매 틱 브로드캐스트),
+> `GAME_ENDED`(20026)는 이 문서의 프로토콜 표에 없습니다. 최신 opcode 표는
+> `Docs/클라이언트_구현_가이드.md` §3을 참고하세요.
 - **파라미터**:
   - command_type: int (명령 타입 식별자)
   - command_data: object (직렬화된 Command 객체)

@@ -81,6 +81,10 @@ namespace BaseServer.Core.Game.Entities
         #region 초기화 및 정리
         public void Initialize(ClientSession clientSession, ICommandSender sender)
         {
+            // 이전 세션이 남아있으면 먼저 정리하여 동적 핸들러 등록을 대칭적으로 유지한다.
+            if (this.clientSession != null)
+                Cleanup();
+
             this.clientSession = clientSession;
             this.commandSender = sender;
 
@@ -128,7 +132,7 @@ namespace BaseServer.Core.Game.Entities
         private async Task HandleSubmitCommand(Protocol _protocol)
         {
             var commandTypeVal = _protocol.GetParam<int>("commandType");
-            if (commandTypeVal == 0)
+            if (!Enum.IsDefined(typeof(GameCommandType), commandTypeVal))
             {
                 return;
             }
@@ -137,6 +141,8 @@ namespace BaseServer.Core.Game.Entities
             Command command;
             switch (commandType)
             {
+                case GameCommandType.None:
+                    return;
                 case GameCommandType.ProduceFleet:
                     command = new ProduceFleetCommand(_protocol);
                     break;

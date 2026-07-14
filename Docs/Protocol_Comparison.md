@@ -53,4 +53,4 @@
     *   `GAME_SET` (20200)
     *   `GAME_STARTED` (20201)
     *   `GAME_STATE` (20202)
-    *   `GAME_ENDED` (20203)
+    *   `GAME_ENDED` (실제 값은 **20026** — 이 문서 작성 시점 이후 코드가 변경됨, `Servers/CommonLib/ProtocolTypes.cs` 확인됨)

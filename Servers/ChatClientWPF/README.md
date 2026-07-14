@@ -1,3 +1,8 @@
+> **⚠️ 레거시 테스트 도구.** 원래 2인 채팅 프로토타입(포트 7777) 클라이언트로 만들어졌으며,
+> 현재 게임 서버(`BaseServer`, 포트 9000)의 배포 대상 클라이언트가 아닙니다(로컬 전용 개발 도구).
+> 정식 클라이언트는 Unity(`Interplanetary_client`)입니다. 자세한 내용은 프로젝트 루트
+> [`README.md`](../../README.md)를 참고하세요.
+
 # ChatClientWPF - MVP 패턴 채팅 클라이언트
 
 WPF 기반 채팅 클라이언트로, **MVP(Model-View-Presenter)** 패턴을 충실히 따라 구현되었습니다.

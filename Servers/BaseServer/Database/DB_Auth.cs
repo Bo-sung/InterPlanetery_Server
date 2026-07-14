@@ -11,7 +11,7 @@ namespace BaseServer.Database
         /// 로그인 인증 - userinfo 테이블에서 사용자 확인
         /// </summary>
         /// <param name="username">사용자 이름</param>
-        /// <param name="password">비밀번호 (평문 - 실제로는 해싱 필요)</param>
+        /// <param name="password">클라이언트가 제출한 비밀번호</param>
         /// <returns>인증 성공 시 UserInfo, 실패 시 null</returns>
         public UserInfo? AuthenticateUser(string username, string password)
         {
@@ -24,27 +24,37 @@ namespace BaseServer.Database
                 {
                     connection.Open();
 
-                    // 파라미터화된 쿼리 (SQL Injection 방지)
-                    string query = "SELECT id, name FROM userinfo WHERE name = @name AND password = @password";
+                    string query = "SELECT id, name, password FROM userinfo WHERE name = @name LIMIT 1";
 
                     using (MySqlCommand command = new MySqlCommand(query, connection))
                     {
-                        // 파라미터 바인딩
                         command.Parameters.AddWithValue("@name", username);
-                        command.Parameters.AddWithValue("@password", password);
 
+                        int userId;
+                        string userName;
+                        string storedPassword;
                         using (MySqlDataReader reader = command.ExecuteReader())
                         {
-                            if (reader.Read())
-                            {
-                                // 인증 성공 - UserInfo 생성
-                                return new UserInfo
-                                {
-                                    UserId = reader.GetInt32("id"),
-                                    UserName = reader.GetString("name")
-                                };
-                            }
+                            if (!reader.Read())
+                                return null;
+
+                            userId = reader.GetInt32("id");
+                            userName = reader.GetString("name");
+                            storedPassword = reader.GetString("password");
                         }
+
+                        PasswordVerificationResult verification = PasswordHasher.Verify(password, storedPassword);
+                        if (verification == PasswordVerificationResult.Failed)
+                            return null;
+
+                        if (verification == PasswordVerificationResult.SuccessRehashNeeded)
+                            TryUpgradePassword(connection, userId, password, storedPassword);
+
+                        return new UserInfo
+                        {
+                            UserId = userId,
+                            UserName = userName
+                        };
                     }
                 }
             }
@@ -84,12 +94,12 @@ namespace BaseServer.Database
                         }
                     }
 
-                    // 사용자 추가
+                    string passwordHash = PasswordHasher.HashPassword(password);
                     string insertQuery = "INSERT INTO userinfo (name, password) VALUES (@name, @password)";
                     using (MySqlCommand insertCmd = new MySqlCommand(insertQuery, connection))
                     {
                         insertCmd.Parameters.AddWithValue("@name", username);
-                        insertCmd.Parameters.AddWithValue("@password", password);
+                        insertCmd.Parameters.AddWithValue("@password", passwordHash);
                         int rowsAffected = insertCmd.ExecuteNonQuery();
                         return rowsAffected > 0;
                     }
@@ -128,6 +138,29 @@ namespace BaseServer.Database
             {
                 Logger.Log($"[DB_Auth] UserExists Error: {ex.Message}");
                 return false;
+            }
+        }
+
+        private static void TryUpgradePassword(
+            MySqlConnection connection,
+            int userId,
+            string password,
+            string previousStoredValue)
+        {
+            try
+            {
+                string passwordHash = PasswordHasher.HashPassword(password);
+                const string query = "UPDATE userinfo SET password = @password WHERE id = @id AND password = @previousPassword";
+
+                using var command = new MySqlCommand(query, connection);
+                command.Parameters.AddWithValue("@password", passwordHash);
+                command.Parameters.AddWithValue("@id", userId);
+                command.Parameters.AddWithValue("@previousPassword", previousStoredValue);
+                command.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[DB_Auth] Password hash upgrade failed for user id {userId}: {ex.Message}");
             }
         }
     }

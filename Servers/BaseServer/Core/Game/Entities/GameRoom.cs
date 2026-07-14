@@ -291,6 +291,9 @@ namespace BaseServer.Core.Game.Entities
 
                 if (m_users[slot] == null || !m_users[slot].IsValid)
                 {
+                    if (!session.TryTransitionTo(SessionState.Room))
+                        return false;
+
                     if (m_users[slot] == null)
                         m_users[slot] = new GameRoomUser();
 
@@ -341,8 +344,13 @@ namespace BaseServer.Core.Game.Entities
 
                 int playerId = m_users[slot].ID;
                 string playerName = m_users[slot].Name;
+                ClientSession session = m_users[slot].Session;
+
+                gameInstance.UserLeave(session);
 
                 m_users[slot].Cleanup();
+                session.CurrentRoom = null;
+                session.TryTransitionTo(SessionState.Lobby);
 
                 Logger.Log($"[Room {RoomId}] Player {playerId} ({playerName}) left. ({PlayerCount}/{MaxPlayers})");
 
@@ -498,14 +506,5 @@ namespace BaseServer.Core.Game.Entities
             }
         }
         #endregion
-    }
-
-    public enum GameCommandType
-    {
-        None = 0,
-        ProduceFleet = 1,
-        MoveFleet = 2,
-        AttackFleet = 3,
-        // 추가 커맨드...
     }
 }

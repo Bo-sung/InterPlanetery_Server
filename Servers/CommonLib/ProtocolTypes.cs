@@ -92,6 +92,7 @@
 
     public struct WaittingRoomUser
     {
+        [Newtonsoft.Json.JsonProperty("userInfo")]
         public UserInfo userInfo { get; set; }
         public bool IsReady { get; set; }
     }

@@ -6,8 +6,9 @@ namespace CommonLib.Commands
     // 기존 BaseServer의 GameCommandType을 CommonLib.Commands로 옮겨옴
     public enum GameCommandType
     {
-        ProduceFleet,
-        MoveFleet,
+        None = 0,
+        ProduceFleet = 1,
+        MoveFleet = 2,
         // ... 기타 명령 타입 ...
     }
 

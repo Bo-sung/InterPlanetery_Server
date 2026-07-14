@@ -192,6 +192,7 @@ namespace BaseServer.Core.Game.Entities
         private long m_startTime = 0;                   // 게임 시작 시간 (Unix 밀리초)
         private long m_tickCount = 0;                   // 현재 틱 카운터 (게임 시작부터 누적)
         private bool m_disposed = false;                // Dispose 호출 여부
+        private bool m_cleanedUp = false;               // Cleanup 호출 여부 (중복 정리 방지)
 
         // 명령 관리
         private Dictionary<long, List<Command>> m_commandQueue = new Dictionary<long, List<Command>>();
@@ -222,6 +223,9 @@ namespace BaseServer.Core.Game.Entities
 
         /// <summary>현재 틱 번호</summary>
         public long CurrentTick => m_tickCount;
+
+        /// <summary>현재 유효한(세션이 연결된) 플레이어 수 (진단/테스트용)</summary>
+        internal int ActivePlayerCount => GetValidPlayerCount();
         #endregion
 
         #region 생성자
@@ -342,6 +346,11 @@ namespace BaseServer.Core.Game.Entities
                 {
                     // 플레이어 초기화 및 세션 연결
                     m_players[i].Initialize(session, commandSender);
+                    if (!session.TryTransitionTo(SessionState.InGame))
+                    {
+                        m_players[i].Cleanup();
+                        return false;
+                    }
                     Logger.Log($"[Game] Player {session.SessionId} joined at slot {i}");
                     return true;
                 }
@@ -370,7 +379,16 @@ namespace BaseServer.Core.Game.Entities
                 {
                     // 플레이어 슬롯 정리
                     m_players[i].Cleanup();
+                    session.TryTransitionTo(SessionState.Room);
                     Logger.Log($"[Game] Player {session.SessionId} left from slot {i}");
+
+                    // 진행 중인 게임에서 마지막 유효 플레이어가 떠나면 게임 루프를 취소한다.
+                    if (m_gameState == GAMESTATE_RUNNING && GetValidPlayerCount() == 0)
+                    {
+                        Logger.Log("[Game] Last active player left an in-progress game. Stopping game loop.");
+                        StopGame();
+                    }
+
                     return true;
                 }
             }
@@ -589,7 +607,7 @@ namespace BaseServer.Core.Game.Entities
                     foreach (var player in m_players)
                     {
                         if (player != null)
-                            player.OnUserReady -= handler;
+                            player.OnClientReady -= handler;
                     }
                 }
             };
@@ -613,7 +631,7 @@ namespace BaseServer.Core.Game.Entities
                 foreach (var player in m_players)
                 {
                     if (player != null)
-                        player.OnUserReady -= handler;
+                        player.OnClientReady -= handler;
                 }
 
                 // 타임아웃 시에도 게임 시작
@@ -759,6 +777,11 @@ namespace BaseServer.Core.Game.Entities
         /// </summary>
         private void Cleanup()
         {
+            // 중복 정리 방지 (게임 종료 정리는 멱등해야 한다)
+            if (m_cleanedUp)
+                return;
+            m_cleanedUp = true;
+
             Logger.Log("[Game] Cleaning up resources...");
 
             // 게임 상태 종료

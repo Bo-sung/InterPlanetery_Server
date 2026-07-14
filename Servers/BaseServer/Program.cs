@@ -32,8 +32,13 @@ namespace BaseServer
             TcpListener server = null;
             try
             {
-                string host = config.GetValue<string>("Server:Host");
-                int port = config.GetValue<int>("Server:Port");
+                // "Server__Host"/"Server__Port" env vars (double-underscore = ':') override
+                // appsettings.json when set — the compatibility alias documented in docker-compose.yml.
+                string host = Environment.GetEnvironmentVariable("Server__Host") ?? config.GetValue<string>("Server:Host");
+                string? portEnv = Environment.GetEnvironmentVariable("Server__Port");
+                int port = (portEnv != null && int.TryParse(portEnv, out int envPort))
+                    ? envPort
+                    : config.GetValue<int>("Server:Port");
 
                 IPAddress localAddr;
 
